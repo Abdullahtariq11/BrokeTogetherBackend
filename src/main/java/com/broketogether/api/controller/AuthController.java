@@ -45,7 +45,7 @@ public class AuthController {
    *                                                                             invalid
    */
   @PostMapping("/login")
-  public ResponseEntity<?> Login(@RequestBody LoginRequest loginRequest) {
+  public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
 
     // This is NOT the JWT token - it's Spring Security's authentication object
     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -66,7 +66,7 @@ public class AuthController {
     String jwt = jwtUtils.generateToken(authentication);
     User userDetails = (User) authentication.getPrincipal();
 
-    JwtResponse response = new JwtResponse(jwt, userDetails.getEmail(), userDetails.getFullname());
+    JwtResponse response = new JwtResponse(jwt, userDetails.getEmail(), userDetails.getName());
 
     return ResponseEntity.ok(response);
   }

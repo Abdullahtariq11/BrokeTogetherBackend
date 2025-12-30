@@ -43,10 +43,10 @@ public class RegisterRequest {
    * @param password The user's password (will be hashed)
    * @param name     The user's display name
    */
-  public RegisterRequest(String email, String password, String name) {
+  public RegisterRequest(String name,String email, String password) {
+    this.name = name;
     this.username = email;
     this.password = password;
-    this.name = name;
   }
 
   /**
@@ -73,7 +73,7 @@ public class RegisterRequest {
   /**
    * @param name the name to set
    */
-  public void setName(String name) {
+  public void name(String name) {
     this.name = name;
   }
 

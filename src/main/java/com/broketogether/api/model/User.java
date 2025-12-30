@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -28,11 +29,12 @@ public class User implements UserDetails {
   private Long id;
 
   @Column(name = "full_name", nullable = false, length = 100)
-  private String fullname;
+  private String name;
 
   @Column(unique = true, nullable = false, length = 100)
   private String email;
 
+  @JsonIgnore
   @Column(nullable = false, length = 100)
   private String password;
 
@@ -53,10 +55,11 @@ public class User implements UserDetails {
   /**
    * 
    */
-  public User(String fullname, String username, String password) {
-    this.fullname = fullname;
+  public User(String name, String username, String password) {
+    this.name = name;
     this.email = username;
     this.password = password;
+    this.role = "USER";
   }
 
   /**
@@ -76,15 +79,15 @@ public class User implements UserDetails {
   /**
    * @return the fullname
    */
-  public String getFullname() {
-    return fullname;
+  public String getName() {
+    return name;
   }
 
   /**
-   * @param fullname the fullname to set
+   * @param name the fullname to set
    */
-  public void setFullname(String fullname) {
-    this.fullname = fullname;
+  public void setName(String name) {
+    this.name = name;
   }
 
   /**
@@ -102,14 +105,14 @@ public class User implements UserDetails {
   }
 
   /**
-   * @param sets the role for user
+   * @param role sets the role for user
    */
   public void setRole(String role) {
     this.role = role;
   }
 
   /**
-   * @param username the username to set
+   * @param email  the username to set
    */
   public void setEmail(String email) {
     this.email = email;
@@ -138,7 +141,7 @@ public class User implements UserDetails {
 
   @Override
   public String toString() {
-    return "User [id=" + id + ", fullname=" + fullname + ", email=" + email + ", password="
+    return "User [id=" + id + ", name=" + name + ", email=" + email + ", password="
         + password + ", createdAt=" + createdAt + ", role=" + role + "]";
   }
 
