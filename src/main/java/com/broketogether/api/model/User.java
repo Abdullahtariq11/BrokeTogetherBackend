@@ -2,7 +2,9 @@ package com.broketogether.api.model;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.hibernate.annotations.CreationTimestamp;
@@ -10,11 +12,14 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 /**
@@ -44,6 +49,15 @@ public class User implements UserDetails {
 
   @Column(nullable = false, length = 100)
   private String role;
+
+  @ManyToMany(mappedBy = "members")
+  @JsonIgnore // Crucial: prevents infinite loops in JSON responses
+  private Set<Home> homes = new HashSet<>();
+
+  //Homes where this user is the "Admin"
+  @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL)
+  @JsonIgnore
+  private Set<Home> homesOwned = new HashSet<>();
 
   /**
    * JPA requires no args constructor
@@ -112,7 +126,7 @@ public class User implements UserDetails {
   }
 
   /**
-   * @param email  the username to set
+   * @param email the username to set
    */
   public void setEmail(String email) {
     this.email = email;
@@ -141,8 +155,8 @@ public class User implements UserDetails {
 
   @Override
   public String toString() {
-    return "User [id=" + id + ", name=" + name + ", email=" + email + ", password="
-        + password + ", createdAt=" + createdAt + ", role=" + role + "]";
+    return "User [id=" + id + ", name=" + name + ", email=" + email + ", password=" + password
+        + ", createdAt=" + createdAt + ", role=" + role + "]";
   }
 
   @Override
