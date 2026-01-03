@@ -55,7 +55,7 @@ public class User implements UserDetails {
   private Set<Home> homes = new HashSet<>();
 
   //Homes where this user is the "Admin"
-  @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL)
+  @OneToMany(mappedBy = "creator", cascade = CascadeType.ALL)
   @JsonIgnore
   private Set<Home> homesOwned = new HashSet<>();
 
