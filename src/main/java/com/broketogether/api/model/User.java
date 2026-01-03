@@ -152,6 +152,35 @@ public class User implements UserDetails {
   public LocalDateTime getCreatedAt() {
     return createdAt;
   }
+  
+
+  /**
+   * @return the homes
+   */
+  public Set<Home> getHomes() {
+    return homes;
+  }
+
+  /**
+   * @param homes the homes to set
+   */
+  public void setHomes(Set<Home> homes) {
+    this.homes = homes;
+  }
+
+  /**
+   * @return the homesOwned
+   */
+  public Set<Home> getHomesOwned() {
+    return homesOwned;
+  }
+
+  /**
+   * @param homesOwned the homesOwned to set
+   */
+  public void setHomesOwned(Set<Home> homesOwned) {
+    this.homesOwned = homesOwned;
+  }
 
   @Override
   public String toString() {
