@@ -135,11 +135,19 @@ public class SecurityConfig {
    */
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
-    http.csrf(crsf -> crsf.disable())
+    http.csrf(csrf -> csrf.disable())
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authorizeHttpRequests(auth -> auth.requestMatchers("/api/v1/auth/**").permitAll()
+        .authorizeHttpRequests(auth -> auth
+            // Public Endpoints
+            .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
+                "/swagger-ui.html")
+            .permitAll()
+
+            // Explicitly protect the Homes API (ensures matchers catch sub-paths)
+            .requestMatchers("/api/v1/homes/**").authenticated()
+
+            // All other requests
             .anyRequest().authenticated())
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

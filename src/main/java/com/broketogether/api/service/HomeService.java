@@ -1,14 +1,15 @@
 package com.broketogether.api.service;
 
-
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.security.auth.login.AccountNotFoundException;
 
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.broketogether.api.dto.HomeResponse;
+import com.broketogether.api.dto.MemberResponse;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.HomeRepository;
@@ -27,40 +28,33 @@ public class HomeService {
     this.userRepository = userRepository;
   }
 
-  /**
-   * Creates a new home and sets the current user as the owner and first member.
-   * 
-   * @throws AccountNotFoundException
-   */
   @Transactional
-  public Home createHome(String name) throws AccountNotFoundException {
-    // Find the currently authenticated user
+  public HomeResponse createHome(String name) throws AccountNotFoundException {
     User userDetails = getUserDetails();
 
     Home home = new Home();
     home.setName(name);
     home.setCreator(userDetails);
     home.getMembers().add(userDetails);
-    return homeRepository.save(home);
+    Home homeCreated = homeRepository.save(home);
+    return new HomeResponse(homeCreated.getId(), homeCreated.getName(),
+        homeCreated.getInviteCode());
   }
 
-  /**
-   * Allows a user to join an existing home using its unique invite code.
-   * 
-   * @throws AccountNotFoundException
-   */
   @Transactional
-  public Home joinHome(String inviteCode) throws AccountNotFoundException {
+  public HomeResponse joinHome(String inviteCode) throws AccountNotFoundException {
     Home home = homeRepository.findByInviteCode(inviteCode)
         .orElseThrow(() -> new RuntimeException("Invalid invite code."));
     User userDetails = getUserDetails();
     home.getMembers().add(userDetails);
-    return homeRepository.save(home);
+    Home homeCreated = homeRepository.save(home);
+    return new HomeResponse(homeCreated.getId(), homeCreated.getName(),
+        homeCreated.getInviteCode());
   }
 
   @Transactional
   public void removeMembers(Long homeId, Long memberId) throws AccountNotFoundException {
-    Home home = homeRepository.findById(memberId)
+    Home home = homeRepository.findById(homeId) 
         .orElseThrow(() -> new EntityNotFoundException("Home with this Id not found"));
     User user = userRepository.findById(memberId)
         .orElseThrow(() -> new AccountNotFoundException("User with this Id not found"));
@@ -76,45 +70,49 @@ public class HomeService {
   }
 
   /**
-   * @return Homes where user is member.
-   * @throws AccountNotFoundException
+   * Get all homes where user is a member.
    */
-  public Set<Home> getUserHomes() throws AccountNotFoundException {
-    User userDetails = getUserDetails();
-    return userDetails.getHomes();
+  @Transactional(readOnly = true)
+  public Set<HomeResponse> getUserHomes() throws AccountNotFoundException {
+    User currentUser = getUserDetails();
+
+    Set<Home> homes = homeRepository.findByMembersContaining(currentUser);
+
+    return homes.stream().map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode()))
+        .collect(Collectors.toSet());
   }
 
   /**
    * Returns all members of a specific home.
    */
-  public Set<User> getHomeMembers(Long homeId) {
+  @Transactional(readOnly = true)
+  public Set<MemberResponse> getHomeMembers(Long homeId) {
     Home home = homeRepository.findById(homeId)
         .orElseThrow(() -> new RuntimeException("Home not found"));
-    return home.getMembers();
+    return home.getMembers().stream().map(h -> new MemberResponse(h.getId(), h.getName()))
+        .collect(Collectors.toSet());
   }
 
   /**
-   * @return Homes which user owns.
-   * @throws AccountNotFoundException
+   * Get homes owned by user.
    */
-  public Set<Home> getUserOwnedHome() throws AccountNotFoundException {
-    User userDetails = getUserDetails();
-    return userDetails.getHomesOwned();
+  @Transactional(readOnly = true)
+  public Set<HomeResponse> getUserOwnedHome() throws AccountNotFoundException {
+    User currentUser = getUserDetails();
+
+    Set<Home> homes = homeRepository.findByCreatorId(currentUser.getId());
+
+    return homes.stream().map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode()))
+        .collect(Collectors.toSet());
   }
 
-  /**
-   * @param homeId
-   * @return home to the specified id.
-   */
-  public Home getHomeById(Long homeId) {
-    return homeRepository.findById(homeId)
+  @Transactional(readOnly = true)
+  public HomeResponse getHomeById(Long homeId) {
+    Home home = homeRepository.findById(homeId)
         .orElseThrow(() -> new RuntimeException("Home not found"));
+    return new HomeResponse(home.getId(), home.getName(), home.getInviteCode());
   }
 
-  /**
-   * @return User from the security infromation.
-   * @throws AccountNotFoundException
-   */
   private User getUserDetails() throws AccountNotFoundException {
     User userDetails = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     if (userDetails == null) {
@@ -122,5 +120,4 @@ public class HomeService {
     }
     return userDetails;
   }
-
 }

@@ -1,6 +1,5 @@
 package com.broketogether.api.controller;
 
-import java.util.HashSet;
 import java.util.Set;
 
 import javax.security.auth.login.AccountNotFoundException;
@@ -15,10 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.broketogether.api.dto.HomeRequest;
+import com.broketogether.api.dto.HomeResponse;
 import com.broketogether.api.dto.JoinRequest;
 import com.broketogether.api.dto.MemberResponse;
-import com.broketogether.api.model.Home;
-import com.broketogether.api.model.User;
 import com.broketogether.api.service.HomeService;
 
 @RestController
@@ -32,35 +30,30 @@ public class HomeController {
   }
 
   @PostMapping
-  public ResponseEntity<Home> create(@RequestBody HomeRequest request)
+  public ResponseEntity<HomeResponse> create(@RequestBody HomeRequest request)
       throws AccountNotFoundException {
     return ResponseEntity.status(201).body(homeService.createHome(request.getName()));
   }
 
   @PostMapping("/join")
-  public ResponseEntity<Home> join(@RequestBody JoinRequest request)
+  public ResponseEntity<HomeResponse> join(@RequestBody JoinRequest request)
       throws AccountNotFoundException {
     return ResponseEntity.ok(homeService.joinHome(request.getInviteCode()));
   }
 
   @GetMapping("/my-homes")
-  public ResponseEntity<Set<Home>> getHomes() throws AccountNotFoundException {
+  public ResponseEntity<Set<HomeResponse>> getHomes() throws AccountNotFoundException {
     return ResponseEntity.ok(homeService.getUserHomes());
   }
 
   @GetMapping("/{homeId}/members")
   public ResponseEntity<Set<MemberResponse>> getMembers(@PathVariable Long homeId) {
-    Set<User> members = homeService.getHomeMembers(homeId);
-    Set<MemberResponse> memberDtos = new HashSet<MemberResponse>();
-    for (User member : members) {
-      MemberResponse memberDto = new MemberResponse(member.getId(), member.getName());
-      memberDtos.add(memberDto);
-    }
-    return ResponseEntity.ok(memberDtos);
+    Set<MemberResponse> members = homeService.getHomeMembers(homeId);
+    return ResponseEntity.ok(members);
   }
 
   @GetMapping("/{homeId}")
-  public ResponseEntity<Home> getHomeById(@PathVariable Long homeId) {
+  public ResponseEntity<HomeResponse> getHomeById(@PathVariable Long homeId) {
     return ResponseEntity.ok(homeService.getHomeById(homeId));
   }
 
@@ -70,6 +63,12 @@ public class HomeController {
     homeService.removeMembers(homeId, userId);
     return ResponseEntity.noContent().build();
 
+  }
+
+  @GetMapping("/{homeId}/invite-code")
+  public ResponseEntity<String> getInviteCode(@PathVariable Long homeId) {
+    HomeResponse home = homeService.getHomeById(homeId);
+    return ResponseEntity.ok(home.getInviteCode());
   }
 
 }

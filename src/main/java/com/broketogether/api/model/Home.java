@@ -4,6 +4,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -22,10 +24,12 @@ public class Home {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "creator_id", nullable = false)
+  @JsonIgnore
   private User creator;
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(name = "user_homes", joinColumns = @JoinColumn(name = "home_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
+  @JsonIgnore
   private Set<User> members = new HashSet<>();
 
   /**
