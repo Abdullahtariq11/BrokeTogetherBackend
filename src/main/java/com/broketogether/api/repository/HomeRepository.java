@@ -23,5 +23,6 @@ public interface HomeRepository extends JpaRepository<Home, Long> {
 
   // Find homes created by a specific user
   Set<Home> findByCreatorId(Long creatorId);
+  
 
 }

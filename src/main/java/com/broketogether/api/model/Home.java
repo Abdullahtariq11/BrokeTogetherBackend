@@ -33,19 +33,29 @@ public class Home {
   private Set<User> members = new HashSet<>();
 
   /**
-   * @return the name
+   * Default Constructor
    */
-  public String getName() {
-    return name;
+  public Home() {
   }
 
+  /**
+   * Constructor with parameters
+   * 
+   * @param name
+   * @param creator
+   * @param members
+   */
   public Home(String name, User creator, Set<User> members) {
     this.name = name;
     this.creator = creator;
     this.members = members;
   }
 
-  public Home() {
+  /**
+   * @return the name
+   */
+  public String getName() {
+    return name;
   }
 
   /**
