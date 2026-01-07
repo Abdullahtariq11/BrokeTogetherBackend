@@ -1,10 +1,11 @@
 package com.broketogether.api.dto;
 
+import java.math.BigDecimal;
 import java.util.Set;
 
 public class ExpenseWithUserRequest {
 
-  private Double amount;
+  private BigDecimal amount;
 
   private String description;
 
@@ -28,7 +29,7 @@ public class ExpenseWithUserRequest {
    * @param homeId
    * @param userId
    */
-  public ExpenseWithUserRequest(Double amount, String description, String category, Long homeId,
+  public ExpenseWithUserRequest(BigDecimal amount, String description, String category, Long homeId,
       Set<Long> userId) {
     this.amount = amount;
     this.description = description;
@@ -40,14 +41,14 @@ public class ExpenseWithUserRequest {
   /**
    * @return the amount
    */
-  public Double getAmount() {
+  public BigDecimal getAmount() {
     return amount;
   }
 
   /**
    * @param amount the amount to set
    */
-  public void setAmount(Double amount) {
+  public void setAmount(BigDecimal amount) {
     this.amount = amount;
   }
 

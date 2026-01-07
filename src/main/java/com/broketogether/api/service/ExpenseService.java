@@ -1,11 +1,14 @@
 package com.broketogether.api.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.security.auth.login.AccountNotFoundException;
 
@@ -55,7 +58,11 @@ public class ExpenseService {
     Home home = homeRepository.findById(expenseRequest.getHomeId())
         .orElseThrow(() -> new RuntimeException("Home with this id doesnot exist."));
 
-    if (!home.getMembers().contains(userDetails)) {
+    // Check if any member in the home has an ID matching the current user's ID
+    boolean isMember = home.getMembers().stream()
+        .anyMatch(member -> member.getId().equals(userDetails.getId()));
+
+    if (!isMember) {
       throw new RuntimeException("You are not a member of this home");
     }
 
@@ -72,7 +79,8 @@ public class ExpenseService {
     if (members.isEmpty())
       throw new RuntimeException("No members in home");
 
-    Double splitAmount = expense.getAmount() / members.size();
+    BigDecimal splitAmount = expense.getAmount().divide(BigDecimal.valueOf(members.size()), 2,
+        RoundingMode.HALF_UP);
     List<ExpenseSplit> expenseSplits = new ArrayList<>();
 
     for (User member : members) {
@@ -108,7 +116,11 @@ public class ExpenseService {
     Home home = homeRepository.findById(expenseRequest.getHomeId())
         .orElseThrow(() -> new RuntimeException("Home with this id doesnot exist."));
 
-    if (!home.getMembers().contains(userDetails)) {
+    // Check if any member in the home has an ID matching the current user's ID
+    boolean isMember = home.getMembers().stream()
+        .anyMatch(member -> member.getId().equals(userDetails.getId()));
+
+    if (!isMember) {
       throw new RuntimeException("You are not a member of this home");
     }
 
@@ -126,7 +138,7 @@ public class ExpenseService {
         throw new RuntimeException("User " + member.getId() + " is not a member of this home");
       }
     }
-    
+
     if (expenseMembers.size() < 2) {
       throw new RuntimeException("A split requires at least two participants.");
     }
@@ -138,7 +150,8 @@ public class ExpenseService {
     expense.setHome(home);
     expense.setPayer(userDetails);
 
-    Double splitAmount = expense.getAmount() / expenseMembers.size();
+    BigDecimal splitAmount = expense.getAmount().divide(BigDecimal.valueOf(expenseMembers.size()),
+        2, RoundingMode.HALF_UP);
     List<ExpenseSplit> expenseSplits = new ArrayList<>();
 
     for (User member : expenseMembers) {
@@ -156,7 +169,108 @@ public class ExpenseService {
 
     return new ExpenseResponse(expenseCreated.getId(), expenseCreated.getAmount(),
         expenseCreated.getDescription(), expenseCreated.getCategory(), splitResponses);
+  }
 
+  @Transactional(readOnly = true)
+  public List<ExpenseResponse> getAllExpensesForHome(Long homeId) throws AccountNotFoundException {
+    User userDetails = getUserDetails();
+    Home home = homeRepository.findById(homeId)
+        .orElseThrow(() -> new RuntimeException("Home not found."));
+
+    boolean isMember = home.getMembers().stream()
+        .anyMatch(member -> member.getId().equals(userDetails.getId()));
+
+    if (!isMember) {
+      throw new RuntimeException("You are not a member of this home");
+    }
+
+    List<Expense> expenses = expenseRepository.findByHomeId(homeId);
+    List<ExpenseResponse> expenseResponses = new ArrayList<>();
+
+    for (Expense expense : expenses) {
+      Map<Long, ExpenseSplitResponse> splitResponses = new HashMap<>();
+
+      for (ExpenseSplit split : expense.getSplits()) {
+        splitResponses.put(split.getUser().getId(),
+            new ExpenseSplitResponse(split.getId(), split.getAmount()));
+      }
+
+      // Use your constructor for a cleaner look
+      ExpenseResponse response = new ExpenseResponse(expense.getId(), expense.getAmount(),
+          expense.getDescription(), expense.getCategory(), splitResponses);
+
+      expenseResponses.add(response);
+    }
+
+    return expenseResponses;
+  }
+
+  @Transactional(readOnly = true)
+  public ExpenseResponse getExpenseById(Long expenseId) throws AccountNotFoundException {
+    Expense expense = expenseRepository.findById(expenseId)
+        .orElseThrow(() -> new RuntimeException("No expense exists for this id"));
+
+    User userDetails = getUserDetails();
+
+    boolean isMember = expense.getHome().getMembers().stream()
+        .anyMatch(member -> member.getId().equals(userDetails.getId()));
+
+    if (!isMember) {
+      throw new RuntimeException("You are not a member of this home");
+    }
+
+    Map<Long, ExpenseSplitResponse> splitResponses = expense.getSplits().stream()
+        .collect(Collectors.toMap(split -> split.getUser().getId(),
+            split -> new ExpenseSplitResponse(split.getId(), split.getAmount())));
+
+    return new ExpenseResponse(expense.getId(), expense.getAmount(), expense.getDescription(),
+        expense.getCategory(), splitResponses);
+  }
+
+  /**
+   * @return balance for all user who owe how much to who
+   * @throws AccountNotFoundException
+   */
+  @Transactional
+  public Map<Long, BigDecimal> getHomeBalances(Long homeId) throws AccountNotFoundException {
+
+    Home home = homeRepository.findById(homeId)
+        .orElseThrow(() -> new RuntimeException("Home with this id doesnot exist."));
+
+    Map<Long, BigDecimal> balances = new HashMap<>();
+    for (User member : home.getMembers()) {
+      balances.put(member.getId(), BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+    }
+
+    List<Expense> expenses = expenseRepository.findByHomeId(homeId);
+
+    for (Expense expense : expenses) {
+      Long payerId = expense.getPayer().getId();
+      BigDecimal currentPayerBalance = balances.get(payerId);
+      balances.put(payerId, currentPayerBalance.add(expense.getAmount()));
+
+      for (ExpenseSplit split : expense.getSplits()) {
+        Long memberId = split.getUser().getId();
+        BigDecimal currentMemberBalance = balances.get(memberId);
+        balances.put(memberId, currentMemberBalance.subtract(split.getAmount()));
+      }
+    }
+    return balances;
+
+  }
+  
+  @Transactional
+  public void deleteExpense(Long expenseId) throws AccountNotFoundException {
+      User userDetails = getUserDetails();
+      Expense expense = expenseRepository.findById(expenseId)
+          .orElseThrow(() -> new RuntimeException("Expense not found"));
+
+      // Security: Only the person who paid for it can delete it
+      if (!expense.getPayer().getId().equals(userDetails.getId())) {
+          throw new RuntimeException("Only the payer can delete this expense");
+      }
+
+      expenseRepository.delete(expense);
   }
 
   /**

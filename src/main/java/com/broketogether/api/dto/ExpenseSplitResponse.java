@@ -1,9 +1,11 @@
 package com.broketogether.api.dto;
 
+import java.math.BigDecimal;
+
 public class ExpenseSplitResponse {
   private Long id;
 
-  private double amount;
+  private BigDecimal amount;
 
   public ExpenseSplitResponse() {
 
@@ -13,7 +15,7 @@ public class ExpenseSplitResponse {
    * @param id
    * @param amount
    */
-  public ExpenseSplitResponse(Long id, double amount) {
+  public ExpenseSplitResponse(Long id, BigDecimal amount) {
     this.id = id;
     this.amount = amount;
   }
@@ -35,14 +37,14 @@ public class ExpenseSplitResponse {
   /**
    * @return the amount
    */
-  public double getAmount() {
+  public BigDecimal getAmount() {
     return amount;
   }
 
   /**
    * @param amount the amount to set
    */
-  public void setAmount(double amount) {
+  public void setAmount(BigDecimal amount) {
     this.amount = amount;
   }
 

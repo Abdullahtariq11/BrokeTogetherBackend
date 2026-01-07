@@ -1,7 +1,12 @@
 package com.broketogether.api.model;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -10,6 +15,8 @@ import jakarta.persistence.Table;
 @Table(name = "expense-splits")
 public class ExpenseSplit {
 
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -17,16 +24,16 @@ public class ExpenseSplit {
   private Expense expense;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "user")
+  @JoinColumn(name = "user_id")
   private User user;
 
-  private Double amount;
+  private BigDecimal amount;
 
   public ExpenseSplit() {
 
   }
 
-  public ExpenseSplit(Expense expense, User user, Double amount) {
+  public ExpenseSplit(Expense expense, User user, BigDecimal amount) {
 
     this.expense = expense;
     this.user = user;
@@ -78,14 +85,14 @@ public class ExpenseSplit {
   /**
    * @return the amount
    */
-  public Double getAmount() {
+  public BigDecimal getAmount() {
     return amount;
   }
 
   /**
    * @param amount the amount to set
    */
-  public void setAmount(Double amount) {
+  public void setAmount(BigDecimal amount) {
     this.amount = amount;
   }
 

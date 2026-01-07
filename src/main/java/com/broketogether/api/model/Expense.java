@@ -1,11 +1,11 @@
 package com.broketogether.api.model;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.hibernate.annotations.CreationTimestamp;
-import org.springframework.data.annotation.Id;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -15,6 +15,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -32,7 +33,7 @@ public class Expense {
   private String description;
 
   @Column(nullable = false, precision = 10, scale = 2)
-  private Double amount;
+  private BigDecimal amount;
 
   @Column(length = 50)
   private String category;
@@ -58,7 +59,7 @@ public class Expense {
 
   }
 
-  public Expense(Long id, String description, Double amount, String category,
+  public Expense(Long id, String description, BigDecimal amount, String category,
       LocalDateTime createdAt, User payer, Home home, List<ExpenseSplit> splits) {
     this.id = id;
     this.description = description;
@@ -101,14 +102,14 @@ public class Expense {
   /**
    * @return the amount
    */
-  public Double getAmount() {
+  public BigDecimal getAmount() {
     return amount;
   }
 
   /**
    * @param amount the amount to set
    */
-  public void setAmount(Double amount) {
+  public void setAmount(BigDecimal amount) {
     this.amount = amount;
   }
 

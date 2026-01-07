@@ -1,5 +1,6 @@
 package com.broketogether.api.dto;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -10,7 +11,7 @@ public class ExpenseResponse {
 
   private Long id;
 
-  private Double amount;
+  private BigDecimal amount;
 
   private String Description;
 
@@ -30,7 +31,7 @@ public class ExpenseResponse {
    * @param category
    * @param splits
    */
-  public ExpenseResponse(Long id, Double amount, String description, String category,
+  public ExpenseResponse(Long id, BigDecimal amount, String description, String category,
       Map<Long, ExpenseSplitResponse> splits) {
     this.id = id;
     this.amount = amount;
@@ -56,14 +57,14 @@ public class ExpenseResponse {
   /**
    * @return the amount
    */
-  public Double getAmount() {
+  public BigDecimal getAmount() {
     return amount;
   }
 
   /**
    * @param amount the amount to set
    */
-  public void setAmount(Double amount) {
+  public void setAmount(BigDecimal amount) {
     this.amount = amount;
   }
 

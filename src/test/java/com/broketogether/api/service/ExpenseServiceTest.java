@@ -7,6 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -81,7 +82,7 @@ class ExpenseServiceTest {
   @Test
   void createExpenseEqualSpiltWhenNoArguments() throws AccountNotFoundException {
     ExpenseRequest req = new ExpenseRequest();
-    req.setAmount(120.0);
+    req.setAmount(new BigDecimal("120.00"));
     req.setHomeId(10L);
     req.setDescription("Electricity");
 
@@ -112,7 +113,7 @@ class ExpenseServiceTest {
   void createExpense_WithSelectedUsers_ShouldSplitOnlyAmongParticipants() throws AccountNotFoundException {
       // 1. Arrange
       ExpenseWithUserRequest req = new ExpenseWithUserRequest();
-      req.setAmount(150.0);
+      req.setAmount(new BigDecimal("120.00"));
       req.setHomeId(10L);
       req.setUserId((Set<Long>) List.of(2L)); // Only User 2 is selected to split with Payer (ID 1)
       req.setDescription("Special Dinner");
