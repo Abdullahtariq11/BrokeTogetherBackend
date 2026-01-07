@@ -2,6 +2,7 @@ package com.broketogether.api.service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.broketogether.api.dto.ExpenseRequest;
 import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ExpenseSplitResponse;
+import com.broketogether.api.dto.ExpenseWithUserRequest;
 import com.broketogether.api.model.Expense;
 import com.broketogether.api.model.ExpenseSplit;
 import com.broketogether.api.model.Home;
@@ -74,6 +76,72 @@ public class ExpenseService {
     List<ExpenseSplit> expenseSplits = new ArrayList<>();
 
     for (User member : members) {
+      expenseSplits.add(new ExpenseSplit(expense, member, splitAmount));
+    }
+    expense.setSplits(expenseSplits);
+
+    Expense expenseCreated = expenseRepository.save(expense);
+
+    Map<Long, ExpenseSplitResponse> splitResponses = new HashMap<>();
+    for (ExpenseSplit split : expenseCreated.getSplits()) {
+      splitResponses.put(split.getUser().getId(),
+          new ExpenseSplitResponse(split.getId(), split.getAmount()));
+    }
+
+    return new ExpenseResponse(expenseCreated.getId(), expenseCreated.getAmount(),
+        expenseCreated.getDescription(), expenseCreated.getCategory(), splitResponses);
+
+  }
+
+  /**
+   * Create an espense and divide it among user defined in the parameter
+   * 
+   * @param expenseRequest
+   * @return
+   * @throws AccountNotFoundException
+   */
+  @Transactional
+  public ExpenseResponse createExpense(ExpenseWithUserRequest expenseRequest)
+      throws AccountNotFoundException {
+
+    User userDetails = getUserDetails();
+    Home home = homeRepository.findById(expenseRequest.getHomeId())
+        .orElseThrow(() -> new RuntimeException("Home with this id doesnot exist."));
+
+    if (!home.getMembers().contains(userDetails)) {
+      throw new RuntimeException("You are not a member of this home");
+    }
+
+    if (home.getMembers().size() <= 1) {
+      throw new RuntimeException("Not enough members in the home to split.");
+
+    }
+    List<User> selectedMembers = userRepository.findAllById(expenseRequest.getUserId());
+
+    Set<User> expenseMembers = new HashSet<>(selectedMembers);
+    expenseMembers.add(userDetails);
+
+    for (User member : expenseMembers) {
+      if (!home.getMembers().contains(member)) {
+        throw new RuntimeException("User " + member.getId() + " is not a member of this home");
+      }
+    }
+    
+    if (expenseMembers.size() < 2) {
+      throw new RuntimeException("A split requires at least two participants.");
+    }
+
+    Expense expense = new Expense();
+    expense.setAmount(expenseRequest.getAmount());
+    expense.setCategory(expenseRequest.getCategory());
+    expense.setDescription(expenseRequest.getDescription());
+    expense.setHome(home);
+    expense.setPayer(userDetails);
+
+    Double splitAmount = expense.getAmount() / expenseMembers.size();
+    List<ExpenseSplit> expenseSplits = new ArrayList<>();
+
+    for (User member : expenseMembers) {
       expenseSplits.add(new ExpenseSplit(expense, member, splitAmount));
     }
     expense.setSplits(expenseSplits);
