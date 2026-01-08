@@ -31,10 +31,12 @@ public class HomeService {
   @Transactional
   public HomeResponse createHome(String name) throws AccountNotFoundException {
     User userDetails = getUserDetails();
+    
+    User managedUser = userRepository.findById(userDetails.getId()).get();
 
     Home home = new Home();
     home.setName(name);
-    home.setCreator(userDetails);
+    home.setCreator(managedUser);
     home.getMembers().add(userDetails);
     Home homeCreated = homeRepository.save(home);
     return new HomeResponse(homeCreated.getId(), homeCreated.getName(),
