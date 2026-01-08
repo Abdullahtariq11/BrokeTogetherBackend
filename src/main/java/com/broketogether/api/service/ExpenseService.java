@@ -272,6 +272,49 @@ public class ExpenseService {
 
       expenseRepository.delete(expense);
   }
+  
+  /**
+   * Records a direct payment from the logged-in user to another member.
+   * This effectively reduces the debt between them.
+   */
+  @Transactional
+  public ExpenseResponse settleUp(Long homeId, Long payeeId, BigDecimal amount) throws AccountNotFoundException {
+      User payer = getUserDetails(); // The person paying the money
+      User payee = userRepository.findById(payeeId)
+          .orElseThrow(() -> new RuntimeException("Payee not found"));
+      Home home = homeRepository.findById(homeId)
+          .orElseThrow(() -> new RuntimeException("Home not found"));
+
+      // Validation: Both must be in the same home
+      boolean isPayerInHome = home.getMembers().stream().anyMatch(m -> m.getId().equals(payer.getId()));
+      boolean isPayeeInHome = home.getMembers().stream().anyMatch(m -> m.getId().equals(payee.getId()));
+      
+      if (!isPayerInHome || !isPayeeInHome) {
+          throw new RuntimeException("Both users must be members of the same home to settle up");
+      }
+
+      Expense settlement = new Expense();
+      settlement.setAmount(amount);
+      settlement.setCategory("SETTLEMENT"); // Hardcoded category
+      settlement.setDescription("Payment from " + payer.getName() + " to " + payee.getName());
+      settlement.setHome(home);
+      settlement.setPayer(payer);
+
+      // Create a single split for the Payee
+      // Note: We DON'T include the payer in this split because they are the one providing the 100% "Credit"
+      ExpenseSplit split = new ExpenseSplit(settlement, payee, amount);
+      settlement.setSplits(List.of(split));
+
+      Expense saved = expenseRepository.save(settlement);
+      
+      // Return response
+      Map<Long, ExpenseSplitResponse> splitResponses = Map.of(
+          payee.getId(), new ExpenseSplitResponse(saved.getSplits().get(0).getId(), amount)
+      );
+
+      return new ExpenseResponse(saved.getId(), saved.getAmount(), 
+          saved.getDescription(), saved.getCategory(), splitResponses);
+  }
 
   /**
    * @return User logged in

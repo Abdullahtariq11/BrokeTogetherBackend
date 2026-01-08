@@ -112,6 +112,8 @@ public class HomeService {
         .orElseThrow(() -> new RuntimeException("Home not found"));
     return new HomeResponse(home.getId(), home.getName(), home.getInviteCode());
   }
+  
+  
 
   private User getUserDetails() throws AccountNotFoundException {
     User userDetails = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();

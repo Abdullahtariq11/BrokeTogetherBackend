@@ -5,6 +5,7 @@ import java.util.List;
 import javax.security.auth.login.AccountNotFoundException;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.broketogether.api.dto.ExpenseRequest;
 import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ExpenseWithUserRequest;
+import com.broketogether.api.dto.SettlementRequest;
 import com.broketogether.api.service.ExpenseService;
 
 @RestController
@@ -48,7 +50,7 @@ public class ExpenseController {
     return ResponseEntity.status(201).body(expenseService.createExpense(request));
   }
 
-  @GetMapping("/{homeId}")
+  @GetMapping("/home/{homeId}/balances")
   public ResponseEntity<List<ExpenseResponse>> getAllByHomeId(@PathVariable Long homeId)
       throws AccountNotFoundException {
     return ResponseEntity.ok(expenseService.getAllExpensesForHome(homeId));
@@ -58,6 +60,23 @@ public class ExpenseController {
   public ResponseEntity<ExpenseResponse> getById(@PathVariable Long expenseId)
       throws AccountNotFoundException {
     return ResponseEntity.ok(expenseService.getExpenseById(expenseId));
+  }
+
+  @DeleteMapping("/{expenseId}")
+  public ResponseEntity<Void> delete(@PathVariable Long expenseId) throws AccountNotFoundException {
+    expenseService.deleteExpense(expenseId);
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Path: POST /api/v1/expenses/settle Used when one user pays another back
+   * directly.
+   */
+  @PostMapping("/settle")
+  public ResponseEntity<ExpenseResponse> settle(@RequestBody SettlementRequest request)
+      throws AccountNotFoundException {
+    return ResponseEntity.status(201).body(
+        expenseService.settleUp(request.getHomeId(), request.getPayeeId(), request.getAmount()));
   }
 
 }
