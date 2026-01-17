@@ -143,6 +143,7 @@ public class SecurityConfig {
             .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
                 "/swagger-ui.html")
             .permitAll()
+                .requestMatchers("/actuator/**").permitAll()
 
             // Explicitly protect the Homes API (ensures matchers catch sub-paths)
             .requestMatchers("/api/v1/homes/**").authenticated()
