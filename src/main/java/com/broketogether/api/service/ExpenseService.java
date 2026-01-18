@@ -232,36 +232,38 @@ public class ExpenseService {
         expense.getCategory(), splitResponses);
   }
 
-  /**
-   * @return balance for all user who owe how much to who
-   * @throws AccountNotFoundException
-   */
-  @Transactional
+  @Transactional(readOnly = true)
   public Map<Long, BigDecimal> getHomeBalances(Long homeId) throws AccountNotFoundException {
+      Home home = homeRepository.findById(homeId)
+          .orElseThrow(() -> new RuntimeException("Home with this id does not exist."));
 
-    Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home with this id doesnot exist."));
-
-    Map<Long, BigDecimal> balances = new HashMap<>();
-    for (User member : home.getMembers()) {
-      balances.put(member.getId(), BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-    }
-
-    List<Expense> expenses = expenseRepository.findByHomeId(homeId);
-
-    for (Expense expense : expenses) {
-      Long payerId = expense.getPayer().getId();
-      BigDecimal currentPayerBalance = balances.get(payerId);
-      balances.put(payerId, currentPayerBalance.add(expense.getAmount()));
-
-      for (ExpenseSplit split : expense.getSplits()) {
-        Long memberId = split.getUser().getId();
-        BigDecimal currentMemberBalance = balances.get(memberId);
-        balances.put(memberId, currentMemberBalance.subtract(split.getAmount()));
+      Map<Long, BigDecimal> balances = new HashMap<>();
+      // Initialize all members with 0.00
+      for (User member : home.getMembers()) {
+          balances.put(member.getId(), BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
       }
-    }
-    return balances;
 
+      List<Expense> expenses = expenseRepository.findByHomeId(homeId);
+
+      for (Expense expense : expenses) {
+          Long payerId = expense.getPayer().getId();
+
+          for (ExpenseSplit split : expense.getSplits()) {
+              Long memberId = split.getUser().getId();
+              BigDecimal splitAmount = split.getAmount();
+
+              // LOGIC: If I am the payer, and the split is for someone else, they owe me (+)
+              if (!memberId.equals(payerId)) {
+                  // The payer is OWE this money (Positive)
+                  balances.put(payerId, balances.get(payerId).add(splitAmount));
+                  
+                  // The member OWES this money (Negative)
+                  balances.put(memberId, balances.get(memberId).subtract(splitAmount));
+              }
+              // If memberId == payerId, we do nothing. You don't owe yourself.
+          }
+      }
+      return balances;
   }
   
   @Transactional
