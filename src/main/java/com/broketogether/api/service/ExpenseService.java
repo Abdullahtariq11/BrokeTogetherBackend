@@ -233,36 +233,36 @@ public class ExpenseService {
   }
 
   @Transactional(readOnly = true)
-  public Map<Long, BigDecimal> getHomeBalances(Long homeId) throws AccountNotFoundException {
-    Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home with this id does not exist."));
+  public Map<Long, BigDecimal> getHomeBalances(Long homeId) {
+      Home home = homeRepository.findById(homeId)
+          .orElseThrow(() -> new RuntimeException("Home not found."));
 
-    Map<Long, BigDecimal> balances = new HashMap<>();
-    // Initialize all members with 0.00
-    for (User member : home.getMembers()) {
-      balances.put(member.getId(), BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-    }
-
-    List<Expense> expenses = expenseRepository.findByHomeId(homeId);
-
-    for (Expense expense : expenses) {
-      Long payerId = expense.getPayer().getId();
-
-      for (ExpenseSplit split : expense.getSplits()) {
-        Long memberId = split.getUser().getId();
-        BigDecimal splitAmount = split.getAmount();
-
-        // LOGIC: We only care about splits where someone paid for someone ELSE
-        if (!memberId.equals(payerId)) {
-          // 1. The Payer is OWE this money (+)
-          balances.put(payerId, balances.get(payerId).add(splitAmount));
-          
-          // 2. The Member OWES this money (-)
-          balances.put(memberId, balances.get(memberId).subtract(splitAmount));
-        }
+      Map<Long, BigDecimal> balances = new HashMap<>();
+      for (User member : home.getMembers()) {
+          balances.put(member.getId(), BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
       }
-    }
-    return balances;
+
+      List<Expense> expenses = expenseRepository.findByHomeId(homeId);
+
+      for (Expense expense : expenses) {
+          if (expense.getSplits() == null || expense.getPayer() == null) continue;
+
+          Long payerId = expense.getPayer().getId();
+
+          for (ExpenseSplit split : expense.getSplits()) {
+              Long memberId = split.getUser().getId();
+              BigDecimal amount = split.getAmount();
+
+              if (!memberId.equals(payerId)) {
+                  // Update Payer: (Owed money)
+                  balances.compute(payerId, (k, v) -> v.add(amount));
+                  
+                  // Update Member: (Owes money)
+                  balances.compute(memberId, (k, v) -> v.subtract(amount));
+              }
+          }
+      }
+      return balances;
   }
   
   @Transactional
