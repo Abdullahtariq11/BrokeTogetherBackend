@@ -1,6 +1,8 @@
 package com.broketogether.api.controller;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import javax.security.auth.login.AccountNotFoundException;
 
@@ -50,7 +52,17 @@ public class ExpenseController {
     return ResponseEntity.status(201).body(expenseService.createExpense(request));
   }
 
+
+//Change the return type from List<ExpenseResponse> to Map<Long, BigDecimal>
   @GetMapping("/home/{homeId}/balances")
+  public ResponseEntity<Map<Long, BigDecimal>> getBalancesByHomeId(@PathVariable Long homeId)
+      throws AccountNotFoundException {
+    // This now calls the correct calculation logic
+    return ResponseEntity.ok(expenseService.getHomeBalances(homeId));
+  }
+
+//Add a NEW endpoint for the actual expense list (history)
+  @GetMapping("/home/{homeId}/history")
   public ResponseEntity<List<ExpenseResponse>> getAllByHomeId(@PathVariable Long homeId)
       throws AccountNotFoundException {
     return ResponseEntity.ok(expenseService.getAllExpensesForHome(homeId));
