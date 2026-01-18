@@ -133,10 +133,15 @@ public class ExpenseService {
     Set<User> expenseMembers = new HashSet<>(selectedMembers);
     expenseMembers.add(userDetails);
 
+    Set<Long> homeMemberIds = home.getMembers().stream()
+        .map(User::getId)
+        .collect(Collectors.toSet());
+
+
     for (User member : expenseMembers) {
-      if (!home.getMembers().contains(member)) {
-        throw new RuntimeException("User " + member.getId() + " is not a member of this home");
-      }
+        if (!homeMemberIds.contains(member.getId())) {
+            throw new RuntimeException("User " + member.getId() + " is not a member of this home");
+        }
     }
 
     if (expenseMembers.size() < 2) {
