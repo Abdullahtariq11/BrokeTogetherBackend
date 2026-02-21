@@ -1,92 +1,55 @@
 package com.broketogether.api.dto;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 /**
  * Data Transfer Object for user registration requests.
- * 
- * <p>
- * Captures the information needed to create a new user account. This separates
- * the registration API contract from the User entity, allowing the API to
- * evolve independently of the database schema.
- * </p>
- * 
- * <p>
- * Example JSON request body:
- * 
- * <pre>
- * {
- *   "email": "abdullah@example.com",
- *   "password": "mySecurePassword123",
- *   "name": "Abdullah"
- * }
- * </pre>
- * </p>
- * 
- * <p>
- * <b>Note:</b> The password will be BCrypt-hashed by the UserService before
- * being stored in the database. Never store plain-text passwords.
- * </p>
  */
 public class RegisterRequest {
 
+  @NotBlank(message = "Email is required")
+  @Email(message = "Please provide a valid email address")
   private String username;
+
+  @NotBlank(message = "Name is required")
+  @Size(min = 1, max = 100, message = "Name must be between 1 and 100 characters")
   private String name;
+
+  @NotBlank(message = "Password is required")
+  @Size(min = 6, max = 100, message = "Password must be at least 6 characters")
   private String password;
 
-  // Default constructor (required for JSON deserialization)
   public RegisterRequest() {
   }
 
-  /**
-   * Constructor for creating a registration request.
-   * 
-   * @param email    The user's email address
-   * @param password The user's password (will be hashed)
-   * @param name     The user's display name
-   */
-  public RegisterRequest(String name,String email, String password) {
+  public RegisterRequest(String name, String email, String password) {
     this.name = name;
     this.username = email;
     this.password = password;
   }
 
-  /**
-   * @return the username
-   */
   public String getUsername() {
     return username;
   }
 
-  /**
-   * @param username the username to set
-   */
   public void setUsername(String username) {
     this.username = username;
   }
 
-  /**
-   * @return the name
-   */
   public String getName() {
     return name;
   }
 
-  /**
-   * @param name the name to set
-   */
-  public void name(String name) {
+  public void setName(String name) {
     this.name = name;
   }
 
-  /**
-   * @return the password
-   */
   public String getPassword() {
     return password;
   }
 
-  /**
-   * @param password the password to set
-   */
   public void setPassword(String password) {
     this.password = password;
   }

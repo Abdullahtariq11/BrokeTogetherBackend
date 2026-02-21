@@ -15,7 +15,7 @@ import io.jsonwebtoken.security.Keys;
 
 /**
  * Utility class for JWT (JSON Web Token) operations.
- * 
+ *
  * <p>
  * This class handles three main JWT operations:
  * <ul>
@@ -25,13 +25,13 @@ import io.jsonwebtoken.security.Keys;
  * <li>Parsing: Extracting user information (email) from tokens</li>
  * </ul>
  * </p>
- * 
+ *
  * <p>
  * JWT tokens are used for stateless authentication. When a user logs in, they
  * receive a token that they include in subsequent requests. This eliminates the
  * need for server-side session storage.
  * </p>
- * 
+ *
  * @see io.jsonwebtoken.Jwts
  * @see org.springframework.security.core.Authentication
  */
@@ -41,7 +41,7 @@ public class JwtUtils {
   /**
    * Secret key used to sign JWT tokens. Injected from application.properties.
    * Must be at least 64 characters (512 bits) for HS512 algorithm.
-   * 
+   *
    * <p>
    * SECURITY NOTE: In production, this should be stored as an environment
    * variable, not directly in application.properties.
@@ -53,7 +53,7 @@ public class JwtUtils {
   /**
    * Token expiration time in milliseconds. Injected from application.properties.
    * Default: 86400000 ms = 24 hours.
-   * 
+   *
    * <p>
    * After this time, the token becomes invalid and the user must log in again.
    * </p>
@@ -64,13 +64,13 @@ public class JwtUtils {
   /**
    * Generates a cryptographically secure signing key from the configured secret
    * string.
-   * 
+   *
    * <p>
    * The key is generated using HMAC-SHA algorithm and must be at least 512 bits
    * for HS512 signature algorithm. This key is used to both sign (create) and
    * verify (validate) JWT tokens.
    * </p>
-   * 
+   *
    * @return SecretKey object for signing/verifying JWTs
    */
   private SecretKey getSigningKey() {
@@ -79,7 +79,7 @@ public class JwtUtils {
 
   /**
    * Generates a new JWT token for an authenticated user.
-   * 
+   *
    * <p>
    * The token contains:
    * <ul>
@@ -89,16 +89,16 @@ public class JwtUtils {
    * <li><b>Signature:</b> Cryptographic signature to prevent tampering</li>
    * </ul>
    * </p>
-   * 
+   *
    * <p>
    * Example token structure:
-   * 
+   *
    * <pre>
    * eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzAzMTg4ODAwLCJleHAiOjE3MDMyNzUyMDB9.signature
    * [    Header    ].[                        Payload                         ].[Signature]
    * </pre>
    * </p>
-   * 
+   *
    * @param authentication Spring Security Authentication object containing user
    *                       details from successful login
    * @return A compact, URL-safe JWT token string
@@ -108,7 +108,7 @@ public class JwtUtils {
     UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
     return Jwts.builder().setSubject(userPrincipal.getUsername()) // Store user's email as the
-                                                                  // subject
+        // subject
         .setIssuedAt(new Date()) // Set token creation timestamp
         .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs)) // Set expiration time
         .signWith(getSigningKey()) // Sign the token with our secret key (uses HS512 by default)
@@ -117,7 +117,7 @@ public class JwtUtils {
 
   /**
    * Extracts the username (email) from a JWT token.
-   * 
+   *
    * <p>
    * This method:
    * <ol>
@@ -127,19 +127,19 @@ public class JwtUtils {
    * <li>Returns the subject claim (user's email)</li>
    * </ol>
    * </p>
-   * 
+   *
    * <p>
    * This is used by the authentication filter to identify which user is making a
    * request.
    * </p>
-   * 
+   *
    * @param token The JWT token string (without "Bearer " prefix)
    * @return The username (email) stored in the token's subject claim
    * @throws io.jsonwebtoken.JwtException if the token is invalid or expired
    */
   public String getUserNameFromJwtToken(String token) {
     return Jwts.parserBuilder().setSigningKey(getSigningKey()) // Provide the key to verify the
-                                                               // signature
+        // signature
         .build() // Build the parser
         .parseClaimsJws(token) // Parse and verify the signed token
         .getBody() // Get the claims (payload)
@@ -148,7 +148,7 @@ public class JwtUtils {
 
   /**
    * Validates a JWT token by checking its signature, format, and expiration.
-   * 
+   *
    * <p>
    * Validation checks:
    * <ul>
@@ -158,7 +158,7 @@ public class JwtUtils {
    * <li><b>Algorithm:</b> Ensures correct signing algorithm was used</li>
    * </ul>
    * </p>
-   * 
+   *
    * <p>
    * Common failure scenarios:
    * <ul>
@@ -167,7 +167,7 @@ public class JwtUtils {
    * <li>Token format is corrupted → Malformed JWT exception</li>
    * </ul>
    * </p>
-   * 
+   *
    * @param authToken The JWT token string to validate
    * @return true if the token is valid; false if invalid, expired, or malformed
    */
@@ -175,24 +175,15 @@ public class JwtUtils {
     try {
       // Attempt to parse and validate the token
       Jwts.parserBuilder().setSigningKey(getSigningKey()) // Use our secret key for signature
-                                                          // verification
-          .build().parseClaimsJws(authToken); // This throws an exception if token is invalid
+      // verification
+      .build().parseClaimsJws(authToken); // This throws an exception if token is invalid
       return true; // Token is valid
-    } catch (io.jsonwebtoken.security.SecurityException e) {
-      // Thrown when the signature doesn't match (token was tampered with)
-      System.err.println("Invalid JWT signature: " + e.getMessage());
-    } catch (io.jsonwebtoken.MalformedJwtException e) {
-      // Thrown when the token structure is invalid (not properly formatted)
-      System.err.println("Invalid JWT token: " + e.getMessage());
-    } catch (io.jsonwebtoken.ExpiredJwtException e) {
-      // Thrown when the token's expiration time has passed
-      System.err.println("JWT token is expired: " + e.getMessage());
-    } catch (io.jsonwebtoken.UnsupportedJwtException e) {
-      // Thrown when the token uses an unsupported algorithm or format
-      System.err.println("JWT token is unsupported: " + e.getMessage());
-    } catch (IllegalArgumentException e) {
-      // Thrown when the token string is empty or null
-      System.err.println("JWT claims string is empty: " + e.getMessage());
+    } catch (io.jsonwebtoken.security.SecurityException
+        | io.jsonwebtoken.MalformedJwtException
+        | io.jsonwebtoken.ExpiredJwtException
+        | io.jsonwebtoken.UnsupportedJwtException
+        | IllegalArgumentException e) {
+      // Invalid token — silently reject (do not log token details)
     }
     return false; // Token is invalid
   }

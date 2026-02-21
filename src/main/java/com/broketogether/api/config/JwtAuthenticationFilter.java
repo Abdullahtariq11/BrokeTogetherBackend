@@ -20,7 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * JWT Authentication Filter - The "Gatekeeper" for Protected Endpoints.
- * 
+ *
  * <p>
  * This filter intercepts every HTTP request before it reaches the controllers.
  * It checks for a valid JWT token in the Authorization header and authenticates
@@ -38,7 +38,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   /**
    * Core filter method that processes each request.
-   * 
+   *
    * <p>
    * This method is called automatically by Spring Security for every incoming
    * HTTP request. It attempts to authenticate the user based on the JWT token in
@@ -71,15 +71,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   /**
    * Extracts JWT token from the Authorization header.
-   * 
+   *
    * <p>
    * The Authorization header should be in the format:
-   * 
+   *
    * <pre>
    * Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIn0.signature
    * </pre>
    * </p>
-   * 
+   *
    * <p>
    * <b>Extraction Process:</b>
    * </p>
@@ -89,7 +89,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
    * <li>Remove the "Bearer " prefix (7 characters)</li>
    * <li>Return the remaining token string</li>
    * </ol>
-   * 
+   *
    * @param request The HTTP request containing headers
    * @return The JWT token string without "Bearer " prefix, or null if not found
    */

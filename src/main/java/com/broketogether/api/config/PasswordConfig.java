@@ -16,7 +16,7 @@ public class PasswordConfig {
    * Configures the PasswordEncoder bean to use the BCrypt hashing algorithm.
    * BCrypt is a "salted" hashing function, which makes it resistant to rainbow
    * table attacks and provides strong security for user credentials.
-   * 
+   *
    * @return A BCryptPasswordEncoder instance used for password hashing.
    */
   @Bean

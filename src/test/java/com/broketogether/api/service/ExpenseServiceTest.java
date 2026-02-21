@@ -2,20 +2,16 @@ package com.broketogether.api.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import javax.security.auth.login.AccountNotFoundException;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,134 +25,430 @@ import com.broketogether.api.dto.ExpenseRequest;
 import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ExpenseWithUserRequest;
 import com.broketogether.api.model.Expense;
+import com.broketogether.api.model.ExpenseSplit;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.ExpenseRepository;
+import com.broketogether.api.repository.ExpenseSplitRepository;
 import com.broketogether.api.repository.HomeRepository;
 import com.broketogether.api.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
-class ExpenseServiceTest {
+public class ExpenseServiceTest {
 
   @Mock
   private ExpenseRepository expenseRepository;
-  @Mock
-  private HomeRepository homeRepository;
+
   @Mock
   private UserRepository userRepository;
+
+  @Mock
+  private HomeRepository homeRepository;
+
+  @Mock
+  private ExpenseSplitRepository expenseSplitRepository;
+
+  @Mock
+  private SecurityContext securityContext;
+
+  @Mock
+  private Authentication authentication;
 
   @InjectMocks
   private ExpenseService expenseService;
 
-  private User mockUser;
-  private Home mockHome;
+  private User testUser;
+  private User otherUser;
+  private Home testHome;
 
   @BeforeEach
-  void setUp() throws Exception {
-    mockUser = new User();
-    mockUser.setId(1L);
-    mockUser.setEmail("test@test.com");
+  void setUp() {
+    testUser = new User("Test User", "test@example.com", "password");
+    testUser.setId(1L);
 
-    mockHome = new Home();
-    mockHome.setId(10L);
-    mockHome.getMembers().add(mockUser);
+    otherUser = new User("Other User", "other@example.com", "password");
+    otherUser.setId(2L);
 
-    // 2. Mock the Security components
-    Authentication authentication = mock(Authentication.class);
-    SecurityContext securityContext = mock(SecurityContext.class);
+    testHome = new Home();
+    testHome.setId(1L);
+    testHome.setName("Test Home");
+    testHome.setMembers(new HashSet<>(Set.of(testUser, otherUser)));
 
-    // 3. Define the behavior: Context -> Authentication -> Principal (Our User)
-    when(securityContext.getAuthentication()).thenReturn(authentication);
-    when(authentication.getPrincipal()).thenReturn(mockUser);
-
-    // 4. Set the mocked context globally for this test
+    lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
+    lenient().when(authentication.getPrincipal()).thenReturn(testUser);
     SecurityContextHolder.setContext(securityContext);
-
   }
 
-  @Test
-  void createExpenseSucessfully() {
-    // TODO
-  }
+  // ==================== createExpense (Equal Split) Tests ====================
 
-  @Test
-  void createExpenseEqualSpiltWhenNoArguments() throws AccountNotFoundException {
-    ExpenseRequest req = new ExpenseRequest();
-    req.setAmount(new BigDecimal("120.00"));
-    req.setHomeId(10L);
-    req.setDescription("Electricity");
+  @Nested
+  @DisplayName("createExpense with equal splits")
+  class CreateExpenseEqualSplitTests {
 
-    Home mockHome = new Home();
-    mockHome.setId(10L);
-    // Add current user + 2 others = 3 total
-    User u2 = new User();
-    u2.setId(2L);
-    User u3 = new User();
-    u3.setId(3L);
-    mockHome.setMembers(new HashSet<>(Set.of(mockUser, u2, u3)));
+    @Test
+    @DisplayName("Should create expense with equal splits among all members")
+    void shouldCreateExpenseWithEqualSplits() throws AccountNotFoundException {
+      ExpenseRequest request = new ExpenseRequest();
+      request.setHomeId(1L);
+      request.setAmount(new BigDecimal("100.00"));
+      request.setCategory("GROCERIES");
+      request.setDescription("Weekly groceries");
 
-    when(homeRepository.findById(10L)).thenReturn(Optional.of(mockHome));
-    when(expenseRepository.save(any(Expense.class))).thenAnswer(i -> i.getArguments()[0]);
-
-    // 2. Act
-    ExpenseResponse result = expenseService.createExpense(req);
-
-    // 3. Assert
-    assertEquals(120.0, result.getAmount());
-    assertEquals(3, result.getSplits().size());
-    // Check if 120 / 3 = 40
-    assertEquals(40.0, result.getSplits().get(mockUser.getId()).getAmount());
-    verify(expenseRepository).save(any(Expense.class));
-  }
-
-  @Test
-  void createExpense_WithSelectedUsers_ShouldSplitOnlyAmongParticipants() throws AccountNotFoundException {
-      // 1. Arrange
-      ExpenseWithUserRequest req = new ExpenseWithUserRequest();
-      req.setAmount(new BigDecimal("120.00"));
-      req.setHomeId(10L);
-      req.setUserId((Set<Long>) List.of(2L)); // Only User 2 is selected to split with Payer (ID 1)
-      req.setDescription("Special Dinner");
-
-      Home mockHome = new Home();
-      mockHome.setId(10L);
-      
-      User user2 = new User(); user2.setId(2L);
-      User user3 = new User(); user3.setId(3L); // Resident who isn't part of this meal
-      
-      // The home has 3 members total
-      mockHome.setMembers(new HashSet<>(Set.of(mockUser, user2, user3)));
-
-      when(homeRepository.findById(10L)).thenReturn(Optional.of(mockHome));
-      when(userRepository.findAllById(any())).thenReturn(List.of(user2));
-      
-      // Capture the saved expense to verify splits
-      when(expenseRepository.save(any(Expense.class))).thenAnswer(i -> {
-          Expense e = i.getArgument(0);
-          e.setId(500L);
-          return e;
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> {
+        Expense expense = invocation.getArgument(0);
+        expense.setId(1L);
+        long splitId = 1L;
+        for (ExpenseSplit split : expense.getSplits()) {
+          split.setId(splitId++);
+        }
+        return expense;
       });
 
-      // 2. Act
-      ExpenseResponse resp = expenseService.createExpense(req);
+      ExpenseResponse response = expenseService.createExpense(request);
 
-      // 3. Assert
-      assertNotNull(resp);
-      // 150 / 2 people (Payer + User 2) = 75.0 each
-      assertEquals(2, resp.getSplits().size());
-      assertEquals(75.0, resp.getSplits().get(2L).getAmount());
-      assertEquals(75.0, resp.getSplits().get(1L).getAmount());
-      
-      // Verify User 3 was correctly ignored
-      assertFalse(resp.getSplits().containsKey(3L));
-      
+      assertNotNull(response);
+      assertEquals(new BigDecimal("100.00"), response.getAmount());
+      assertEquals("GROCERIES", response.getCategory());
+      assertEquals(2, response.getSplits().size());
+
+      response.getSplits().values().forEach(split ->
+          assertEquals(new BigDecimal("50.00"), split.getAmount())
+      );
       verify(expenseRepository, times(1)).save(any(Expense.class));
-  }
-  
-  @Test
-  void createExpenseSplitUsingPercentage() {
-    //TODO
-    //percentage mentioned along with users 
+    }
+
+    @Test
+    @DisplayName("Should throw exception when home not found")
+    void shouldThrowExceptionWhenHomeNotFound() {
+      ExpenseRequest request = new ExpenseRequest();
+      request.setHomeId(999L);
+
+      when(homeRepository.findById(999L)).thenReturn(Optional.empty());
+
+      RuntimeException exception = assertThrows(RuntimeException.class,
+          () -> expenseService.createExpense(request));
+      assertEquals("Home with this id doesnot exist.", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when user is not a member of the home")
+    void shouldThrowExceptionWhenUserNotMember() {
+      ExpenseRequest request = new ExpenseRequest();
+      request.setHomeId(1L);
+
+      Home homeWithoutUser = new Home();
+      homeWithoutUser.setId(1L);
+      homeWithoutUser.setMembers(new HashSet<>(Set.of(otherUser)));
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(homeWithoutUser));
+
+      RuntimeException exception = assertThrows(RuntimeException.class,
+          () -> expenseService.createExpense(request));
+      assertEquals("You are not a member of this home", exception.getMessage());
+    }
   }
 
+  // ==================== createExpense (Custom Split) Tests ====================
+
+  @Nested
+  @DisplayName("createExpense with user-defined splits")
+  class CreateExpenseCustomSplitTests {
+
+    @Test
+    @DisplayName("Should create expense split among selected users")
+    void shouldCreateExpenseWithSelectedUsers() throws AccountNotFoundException {
+      User thirdUser = new User("Third User", "third@example.com", "password");
+      thirdUser.setId(3L);
+      testHome.getMembers().add(thirdUser);
+
+      ExpenseWithUserRequest request = new ExpenseWithUserRequest();
+      request.setHomeId(1L);
+      request.setAmount(new BigDecimal("90.00"));
+      request.setCategory("DINNER");
+      request.setDescription("Dinner out");
+      request.setUserId(Set.of(2L));
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(userRepository.findAllById(Set.of(2L))).thenReturn(List.of(otherUser));
+      when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> {
+        Expense expense = invocation.getArgument(0);
+        expense.setId(1L);
+        long splitId = 1L;
+        for (ExpenseSplit split : expense.getSplits()) {
+          split.setId(splitId++);
+        }
+        return expense;
+      });
+
+      ExpenseResponse response = expenseService.createExpense(request);
+
+      assertNotNull(response);
+      assertEquals(2, response.getSplits().size());
+      response.getSplits().values().forEach(split ->
+          assertEquals(new BigDecimal("45.00"), split.getAmount())
+      );
+    }
+
+    @Test
+    @DisplayName("Should throw exception when home has only one member")
+    void shouldThrowExceptionWhenNotEnoughMembers() {
+      ExpenseWithUserRequest request = new ExpenseWithUserRequest();
+      request.setHomeId(1L);
+
+      Home singleMemberHome = new Home();
+      singleMemberHome.setId(1L);
+      singleMemberHome.setMembers(new HashSet<>(Set.of(testUser)));
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(singleMemberHome));
+
+      RuntimeException exception = assertThrows(RuntimeException.class,
+          () -> expenseService.createExpense(request));
+      assertEquals("Not enough members in the home to split.", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when selected user not in home")
+    void shouldThrowExceptionWhenUserNotInHome() {
+      User outsider = new User("Outsider", "outsider@example.com", "password");
+      outsider.setId(99L);
+
+      ExpenseWithUserRequest request = new ExpenseWithUserRequest();
+      request.setHomeId(1L);
+      request.setAmount(new BigDecimal("100.00"));
+      request.setUserId(Set.of(99L));
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(userRepository.findAllById(Set.of(99L))).thenReturn(List.of(outsider));
+
+      RuntimeException exception = assertThrows(RuntimeException.class,
+          () -> expenseService.createExpense(request));
+      assertTrue(exception.getMessage().contains("is not a member of this home"));
+    }
+  }
+
+  // ==================== getAllExpensesForHome Tests ====================
+
+  @Nested
+  @DisplayName("getAllExpensesForHome")
+  class GetAllExpensesTests {
+
+    @Test
+    @DisplayName("Should return all expenses for a home")
+    void shouldReturnAllExpenses() throws AccountNotFoundException {
+      Expense expense1 = createMockExpense(1L, new BigDecimal("100.00"), "GROCERIES");
+      Expense expense2 = createMockExpense(2L, new BigDecimal("50.00"), "UTILITIES");
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(expenseRepository.findByHomeId(1L)).thenReturn(List.of(expense1, expense2));
+
+      List<ExpenseResponse> responses = expenseService.getAllExpensesForHome(1L);
+
+      assertEquals(2, responses.size());
+    }
+
+    @Test
+    @DisplayName("Should return empty list when no expenses exist")
+    void shouldReturnEmptyListWhenNoExpenses() throws AccountNotFoundException {
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(expenseRepository.findByHomeId(1L)).thenReturn(Collections.emptyList());
+
+      List<ExpenseResponse> responses = expenseService.getAllExpensesForHome(1L);
+
+      assertTrue(responses.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when user not a member")
+    void shouldThrowWhenNotMember() {
+      Home homeWithoutUser = new Home();
+      homeWithoutUser.setId(1L);
+      homeWithoutUser.setMembers(new HashSet<>(Set.of(otherUser)));
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(homeWithoutUser));
+
+      assertThrows(RuntimeException.class,
+          () -> expenseService.getAllExpensesForHome(1L));
+    }
+  }
+
+  // ==================== getExpenseById Tests ====================
+
+  @Nested
+  @DisplayName("getExpenseById")
+  class GetExpenseByIdTests {
+
+    @Test
+    @DisplayName("Should return expense by ID")
+    void shouldReturnExpenseById() throws AccountNotFoundException {
+      Expense expense = createMockExpense(1L, new BigDecimal("100.00"), "GROCERIES");
+      expense.setHome(testHome);
+
+      when(expenseRepository.findById(1L)).thenReturn(Optional.of(expense));
+
+      ExpenseResponse response = expenseService.getExpenseById(1L);
+
+      assertNotNull(response);
+      assertEquals(1L, response.getId());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when expense not found")
+    void shouldThrowExceptionWhenExpenseNotFound() {
+      when(expenseRepository.findById(999L)).thenReturn(Optional.empty());
+
+      assertThrows(RuntimeException.class,
+          () -> expenseService.getExpenseById(999L));
+    }
+  }
+
+  // ==================== getHomeBalances Tests ====================
+
+  @Nested
+  @DisplayName("getHomeBalances")
+  class GetHomeBalancesTests {
+
+    @Test
+    @DisplayName("Should calculate correct balances")
+    void shouldCalculateCorrectBalances() throws AccountNotFoundException {
+      Expense expense = createMockExpense(1L, new BigDecimal("100.00"), "GROCERIES");
+      expense.setPayer(testUser);
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(expenseRepository.findByHomeId(1L)).thenReturn(List.of(expense));
+
+      Map<Long, BigDecimal> balances = expenseService.getHomeBalances(1L);
+
+      assertEquals(new BigDecimal("50.00"), balances.get(1L));
+      assertEquals(new BigDecimal("-50.00"), balances.get(2L));
+    }
+
+    @Test
+    @DisplayName("Should return zero balances when no expenses")
+    void shouldReturnZeroBalancesWhenNoExpenses() throws AccountNotFoundException {
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(expenseRepository.findByHomeId(1L)).thenReturn(Collections.emptyList());
+
+      Map<Long, BigDecimal> balances = expenseService.getHomeBalances(1L);
+
+      assertEquals(new BigDecimal("0.00"), balances.get(1L));
+      assertEquals(new BigDecimal("0.00"), balances.get(2L));
+    }
+
+    @Test
+    @DisplayName("Should throw exception when user is not a member")
+    void shouldThrowWhenNotMember() {
+      Home homeWithoutUser = new Home();
+      homeWithoutUser.setId(1L);
+      homeWithoutUser.setMembers(new HashSet<>(Set.of(otherUser)));
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(homeWithoutUser));
+
+      assertThrows(RuntimeException.class,
+          () -> expenseService.getHomeBalances(1L));
+    }
+  }
+
+  // ==================== deleteExpense Tests ====================
+
+  @Nested
+  @DisplayName("deleteExpense")
+  class DeleteExpenseTests {
+
+    @Test
+    @DisplayName("Should delete expense when user is payer")
+    void shouldDeleteExpenseWhenUserIsPayer() throws AccountNotFoundException {
+      Expense expense = createMockExpense(1L, new BigDecimal("100.00"), "GROCERIES");
+      expense.setPayer(testUser);
+
+      when(expenseRepository.findById(1L)).thenReturn(Optional.of(expense));
+
+      assertDoesNotThrow(() -> expenseService.deleteExpense(1L));
+      verify(expenseRepository, times(1)).delete(expense);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when user is not payer")
+    void shouldThrowExceptionWhenUserNotPayer() {
+      Expense expense = createMockExpense(1L, new BigDecimal("100.00"), "GROCERIES");
+      expense.setPayer(otherUser);
+
+      when(expenseRepository.findById(1L)).thenReturn(Optional.of(expense));
+
+      RuntimeException exception = assertThrows(RuntimeException.class,
+          () -> expenseService.deleteExpense(1L));
+      assertEquals("Only the payer can delete this expense", exception.getMessage());
+      verify(expenseRepository, never()).delete(any());
+    }
+  }
+
+  // ==================== settleUp Tests ====================
+
+  @Nested
+  @DisplayName("settleUp")
+  class SettleUpTests {
+
+    @Test
+    @DisplayName("Should create settlement expense")
+    void shouldCreateSettlement() throws AccountNotFoundException {
+      when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> {
+        Expense expense = invocation.getArgument(0);
+        expense.setId(1L);
+        expense.getSplits().get(0).setId(1L);
+        return expense;
+      });
+
+      ExpenseResponse response = expenseService.settleUp(1L, 2L, new BigDecimal("50.00"));
+
+      assertNotNull(response);
+      assertEquals("SETTLEMENT", response.getCategory());
+      assertEquals(new BigDecimal("50.00"), response.getAmount());
+      assertTrue(response.getDescription().contains("Payment from"));
+    }
+
+    @Test
+    @DisplayName("Should throw exception when payee not found")
+    void shouldThrowExceptionWhenPayeeNotFound() {
+      when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+      assertThrows(RuntimeException.class,
+          () -> expenseService.settleUp(1L, 999L, new BigDecimal("50.00")));
+    }
+
+    @Test
+    @DisplayName("Should throw exception when users not in same home")
+    void shouldThrowExceptionWhenUsersNotInSameHome() {
+      User outsider = new User("Outsider", "outsider@example.com", "password");
+      outsider.setId(99L);
+
+      when(userRepository.findById(99L)).thenReturn(Optional.of(outsider));
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+
+      RuntimeException exception = assertThrows(RuntimeException.class,
+          () -> expenseService.settleUp(1L, 99L, new BigDecimal("50.00")));
+      assertEquals("Both users must be members of the same home to settle up", exception.getMessage());
+    }
+  }
+
+  // ==================== Helper Methods ====================
+
+  private Expense createMockExpense(Long id, BigDecimal amount, String category) {
+    Expense expense = new Expense();
+    expense.setId(id);
+    expense.setAmount(amount);
+    expense.setCategory(category);
+    expense.setDescription("Test expense");
+    expense.setPayer(testUser);
+    expense.setHome(testHome);
+
+    ExpenseSplit split1 = new ExpenseSplit(expense, testUser, amount.divide(BigDecimal.valueOf(2)));
+    split1.setId(id * 10);
+    ExpenseSplit split2 = new ExpenseSplit(expense, otherUser, amount.divide(BigDecimal.valueOf(2)));
+    split2.setId(id * 10 + 1);
+
+    expense.setSplits(List.of(split1, split2));
+    return expense;
+  }
 }

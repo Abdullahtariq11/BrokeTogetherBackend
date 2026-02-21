@@ -8,6 +8,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,9 +37,9 @@ public class AuthController {
 
   /**
    * Login endpoint - Authenticates user and returns JWT token.
-   * 
+   *
    * @param loginRequest DTO containing user's email and password
-   * 
+   *
    * @return ResponseEntity with JwtResponse containing token and user info
    * @throws org.springframework.security.authentication.BadCredentialsException if
    *                                                                             credentials
@@ -45,7 +47,7 @@ public class AuthController {
    *                                                                             invalid
    */
   @PostMapping("/login")
-  public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+  public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
 
     // This is NOT the JWT token - it's Spring Security's authentication object
     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -74,22 +76,22 @@ public class AuthController {
   /**
    * Registration endpoint - Creates a new user account. User must call the /login
    * endpoint to receive a JWT token.
-   * 
+   *
    * @param registerRequest DTO containing new user's email, password, and name
    * @return ResponseEntity with success message
    * @throws IllegalArgumentException if email already exists (handled by
    *                                  UserService)
    */
   @PostMapping("/register")
-  public ResponseEntity<User> createUser(@RequestBody RegisterRequest registerRequest)
+  public ResponseEntity<String> createUser(@Valid @RequestBody RegisterRequest registerRequest)
       throws NotFoundException {
 
     User user = new User(registerRequest.getName(), registerRequest.getUsername(),
         registerRequest.getPassword());
 
-    User savedUser = userService.saveUser(user);
+    userService.saveUser(user);
 
-    return ResponseEntity.status(201).body(savedUser);
+    return ResponseEntity.status(201).body("Account created successfully.");
   }
 
 }

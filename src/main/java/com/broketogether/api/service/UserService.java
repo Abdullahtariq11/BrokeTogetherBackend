@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.UserRepository;
 

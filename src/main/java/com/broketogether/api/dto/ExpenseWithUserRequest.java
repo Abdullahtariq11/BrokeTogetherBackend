@@ -3,32 +3,34 @@ package com.broketogether.api.dto;
 import java.math.BigDecimal;
 import java.util.Set;
 
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
 public class ExpenseWithUserRequest {
 
+  @NotNull(message = "Amount is required")
+  @DecimalMin(value = "0.01", message = "Amount must be greater than zero")
   private BigDecimal amount;
 
+  @NotBlank(message = "Description is required")
+  @Size(min = 1, max = 255, message = "Description must be between 1 and 255 characters")
   private String description;
 
+  @NotBlank(message = "Category is required")
   private String category;
 
+  @NotNull(message = "Home ID is required")
   private Long homeId;
 
+  @NotEmpty(message = "At least one user must be selected for splitting")
   private Set<Long> userId;
 
-  /**
-   * 
-   */
   public ExpenseWithUserRequest() {
-
   }
 
-  /**
-   * @param amount
-   * @param description
-   * @param category
-   * @param homeId
-   * @param userId
-   */
   public ExpenseWithUserRequest(BigDecimal amount, String description, String category, Long homeId,
       Set<Long> userId) {
     this.amount = amount;
@@ -38,72 +40,42 @@ public class ExpenseWithUserRequest {
     this.userId = userId;
   }
 
-  /**
-   * @return the amount
-   */
   public BigDecimal getAmount() {
     return amount;
   }
 
-  /**
-   * @param amount the amount to set
-   */
   public void setAmount(BigDecimal amount) {
     this.amount = amount;
   }
 
-  /**
-   * @return the description
-   */
   public String getDescription() {
     return description;
   }
 
-  /**
-   * @param description the description to set
-   */
   public void setDescription(String description) {
     this.description = description;
   }
 
-  /**
-   * @return the category
-   */
   public String getCategory() {
     return category;
   }
 
-  /**
-   * @param category the category to set
-   */
   public void setCategory(String category) {
     this.category = category;
   }
 
-  /**
-   * @return the homeId
-   */
   public Long getHomeId() {
     return homeId;
   }
 
-  /**
-   * @param homeId the homeId to set
-   */
   public void setHomeId(Long homeId) {
     this.homeId = homeId;
   }
 
-  /**
-   * @return the userId
-   */
   public Set<Long> getUserId() {
     return userId;
   }
 
-  /**
-   * @param userId the userId to set
-   */
   public void setUserId(Set<Long> userId) {
     this.userId = userId;
   }
