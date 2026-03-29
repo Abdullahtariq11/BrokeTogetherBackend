@@ -30,6 +30,7 @@ public class SecurityConfig {
   private final PasswordEncoder passwordEncoder;
   private final UserDetailsService userDetailsService;
   private final JwtAuthenticationFilter jwtAuthFilter;
+  private final RateLimitFilter rateLimitFilter;
 
   /**
    * Constructor injection of required dependencies.
@@ -37,13 +38,15 @@ public class SecurityConfig {
    * @param userDetailsService Service for loading user details from database
    * @param passwordEncoder    BCrypt encoder for password hashing/verification
    * @param jwtAuthFilter      Filter that validates JWT tokens on each request
+   * @param rateLimitFilter    Filter that limits requests per IP
    */
   public SecurityConfig(PasswordEncoder passwordEncoder, UserDetailsService userDetailsService,
-      JwtAuthenticationFilter jwtAuthFilter) {
+      JwtAuthenticationFilter jwtAuthFilter, RateLimitFilter rateLimitFilter) {
 
     this.passwordEncoder = passwordEncoder;
     this.userDetailsService = userDetailsService;
     this.jwtAuthFilter = jwtAuthFilter;
+    this.rateLimitFilter = rateLimitFilter;
   }
 
   /**
@@ -94,12 +97,13 @@ public class SecurityConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
       CorsConfiguration configuration = new CorsConfiguration();
-      configuration.setAllowedOrigins(Arrays.asList("http://localhost:8080")); 
-            configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-      
+      configuration.setAllowedOrigins(Arrays.asList("*"));
+      configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
       configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
-      
-      configuration.setAllowCredentials(true);
+
+      // Note: allowCredentials cannot be true when allowedOrigins is "*"
+      // Mobile apps send JWT in header, not cookies, so credentials flag is unnecessary
 
       UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
       source.registerCorsConfiguration("/**", configuration);
@@ -173,6 +177,7 @@ public class SecurityConfig {
 
         // All other requests
         .anyRequest().authenticated())
+    .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
     .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
