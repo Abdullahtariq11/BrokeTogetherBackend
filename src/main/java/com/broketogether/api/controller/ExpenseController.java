@@ -21,6 +21,8 @@ import com.broketogether.api.dto.ExpenseWithUserRequest;
 import com.broketogether.api.dto.SettlementRequest;
 import com.broketogether.api.service.ExpenseService;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/api/v1/expenses")
 public class ExpenseController {
@@ -29,39 +31,26 @@ public class ExpenseController {
 
   public ExpenseController(ExpenseService expenseService) {
     this.expenseService = expenseService;
-
   }
 
-  /**
-   * Path: POST /api/v1/expenses // This handles the "Split with everyone in the
-   * Home" logic
-   */
   @PostMapping
-  public ResponseEntity<ExpenseResponse> create(@RequestBody ExpenseRequest request)
+  public ResponseEntity<ExpenseResponse> create(@Valid @RequestBody ExpenseRequest request)
       throws AccountNotFoundException {
     return ResponseEntity.status(201).body(expenseService.createExpense(request));
   }
 
-  /**
-   * Path: POST /api/v1/expenses/selective "create" is a bit redundant in a POST
-   * path, "selective" or "partial" is clearer
-   */
   @PostMapping("/selective")
-  public ResponseEntity<ExpenseResponse> create(@RequestBody ExpenseWithUserRequest request)
+  public ResponseEntity<ExpenseResponse> create(@Valid @RequestBody ExpenseWithUserRequest request)
       throws AccountNotFoundException {
     return ResponseEntity.status(201).body(expenseService.createExpense(request));
   }
 
-
-//Change the return type from List<ExpenseResponse> to Map<Long, BigDecimal>
   @GetMapping("/home/{homeId}/balances")
   public ResponseEntity<Map<Long, BigDecimal>> getBalancesByHomeId(@PathVariable Long homeId)
       throws AccountNotFoundException {
-    // This now calls the correct calculation logic
     return ResponseEntity.ok(expenseService.getHomeBalances(homeId));
   }
 
-//Add a NEW endpoint for the actual expense list (history)
   @GetMapping("/home/{homeId}/history")
   public ResponseEntity<List<ExpenseResponse>> getAllByHomeId(@PathVariable Long homeId)
       throws AccountNotFoundException {
@@ -80,12 +69,8 @@ public class ExpenseController {
     return ResponseEntity.noContent().build();
   }
 
-  /**
-   * Path: POST /api/v1/expenses/settle Used when one user pays another back
-   * directly.
-   */
   @PostMapping("/settle")
-  public ResponseEntity<ExpenseResponse> settle(@RequestBody SettlementRequest request)
+  public ResponseEntity<ExpenseResponse> settle(@Valid @RequestBody SettlementRequest request)
       throws AccountNotFoundException {
     return ResponseEntity.status(201).body(
         expenseService.settleUp(request.getHomeId(), request.getPayeeId(), request.getAmount()));

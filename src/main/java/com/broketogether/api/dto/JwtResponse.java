@@ -2,7 +2,7 @@ package com.broketogether.api.dto;
 
 /**
  * Data Transfer Object for JWT authentication responses.
- * 
+ *
  * <p>
  * This is sent to the client after successful login, containing:
  * <ul>
@@ -11,10 +11,10 @@ package com.broketogether.api.dto;
  * <li>User information (email and name)</li>
  * </ul>
  * </p>
- * 
+ *
  * <p>
  * Example JSON response:
- * 
+ *
  * <pre>
  * {
  *   "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJhYmR1bGxhaEBleGFtcGxlLmNvbSIsImlhdCI6MTcwMzE4ODgwMCwiZXhwIjoxNzAzMjc1MjAwfQ.signature",
@@ -24,11 +24,11 @@ package com.broketogether.api.dto;
  * }
  * </pre>
  * </p>
- * 
+ *
  * <p>
  * The client should store the token and include it in the Authorization header
  * for protected endpoints:
- * 
+ *
  * <pre>
  * Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
  * </pre>
@@ -42,7 +42,7 @@ public class JwtResponse {
 
   /**
    * Constructor for creating a JWT response.
-   * 
+   *
    * @param token The JWT token string
    * @param email The user's email address
    * @param name  The user's display name

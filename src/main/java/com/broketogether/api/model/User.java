@@ -6,11 +6,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -67,7 +68,7 @@ public class User implements UserDetails {
   }
 
   /**
-   * 
+   *
    */
   public User(String name, String username, String password) {
     this.name = name;
@@ -135,6 +136,7 @@ public class User implements UserDetails {
   /**
    * @return the password
    */
+  @Override
   public String getPassword() {
     return password;
   }
@@ -152,7 +154,7 @@ public class User implements UserDetails {
   public LocalDateTime getCreatedAt() {
     return createdAt;
   }
-  
+
 
   /**
    * @return the homes
@@ -184,8 +186,7 @@ public class User implements UserDetails {
 
   @Override
   public String toString() {
-    return "User [id=" + id + ", name=" + name + ", email=" + email + ", password=" + password
-        + ", createdAt=" + createdAt + ", role=" + role + "]";
+    return "User [id=" + id + ", name=" + name + ", email=" + email + ", role=" + role + "]";
   }
 
   @Override

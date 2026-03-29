@@ -1,6 +1,10 @@
 package com.broketogether.api.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class JoinRequest {
+
+  @NotBlank(message = "Invite code is required")
   private String inviteCode;
 
   public JoinRequest() {

@@ -8,6 +8,7 @@ import javax.security.auth.login.AccountNotFoundException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import com.broketogether.api.dto.HomeResponse;
 import com.broketogether.api.dto.MemberResponse;
 import com.broketogether.api.model.Home;
@@ -31,7 +32,7 @@ public class HomeService {
   @Transactional
   public HomeResponse createHome(String name) throws AccountNotFoundException {
     User userDetails = getUserDetails();
-    
+
     User managedUser = userRepository.findById(userDetails.getId()).get();
 
     Home home = new Home();
@@ -56,7 +57,7 @@ public class HomeService {
 
   @Transactional
   public void removeMembers(Long homeId, Long memberId) throws AccountNotFoundException {
-    Home home = homeRepository.findById(homeId) 
+    Home home = homeRepository.findById(homeId)
         .orElseThrow(() -> new EntityNotFoundException("Home with this Id not found"));
     User user = userRepository.findById(memberId)
         .orElseThrow(() -> new AccountNotFoundException("User with this Id not found"));
@@ -80,18 +81,21 @@ public class HomeService {
 
     Set<Home> homes = homeRepository.findByMembersContaining(currentUser);
 
-    return homes.stream().map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode()))
+    return homes.stream()
+        .map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode()))
         .collect(Collectors.toSet());
   }
 
   /**
-   * Returns all members of a specific home.
+   * Returns all members of a specific home. Only accessible to home members.
    */
   @Transactional(readOnly = true)
-  public Set<MemberResponse> getHomeMembers(Long homeId) {
+  public Set<MemberResponse> getHomeMembers(Long homeId) throws AccountNotFoundException {
     Home home = homeRepository.findById(homeId)
         .orElseThrow(() -> new RuntimeException("Home not found"));
-    return home.getMembers().stream().map(h -> new MemberResponse(h.getId(), h.getName()))
+    verifyMembership(home);
+    return home.getMembers().stream()
+        .map(h -> new MemberResponse(h.getId(), h.getName()))
         .collect(Collectors.toSet());
   }
 
@@ -104,18 +108,70 @@ public class HomeService {
 
     Set<Home> homes = homeRepository.findByCreatorId(currentUser.getId());
 
-    return homes.stream().map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode()))
+    return homes.stream()
+        .map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode()))
         .collect(Collectors.toSet());
   }
 
+  /**
+   * Get home by ID. Only accessible to home members.
+   */
   @Transactional(readOnly = true)
-  public HomeResponse getHomeById(Long homeId) {
+  public HomeResponse getHomeById(Long homeId) throws AccountNotFoundException {
     Home home = homeRepository.findById(homeId)
         .orElseThrow(() -> new RuntimeException("Home not found"));
+    verifyMembership(home);
     return new HomeResponse(home.getId(), home.getName(), home.getInviteCode());
   }
-  
-  
+
+  /**
+   * Rename a home. Only the creator (admin) can rename.
+   */
+  @Transactional
+  public HomeResponse renameHome(Long homeId, String newName) throws AccountNotFoundException {
+    Home home = homeRepository.findById(homeId)
+        .orElseThrow(() -> new RuntimeException("Home not found"));
+    User currentUser = getUserDetails();
+
+    if (!home.getCreator().getId().equals(currentUser.getId())) {
+      throw new RuntimeException("You do not have permission to rename this home.");
+    }
+
+    home.setName(newName);
+    Home saved = homeRepository.save(home);
+    return new HomeResponse(saved.getId(), saved.getName(), saved.getInviteCode());
+  }
+
+  /**
+   * Leave a home. The creator cannot leave (they must delete the home instead).
+   */
+  @Transactional
+  public void leaveHome(Long homeId) throws AccountNotFoundException {
+    Home home = homeRepository.findById(homeId)
+        .orElseThrow(() -> new RuntimeException("Home not found"));
+    User currentUser = getUserDetails();
+
+    verifyMembership(home);
+
+    if (home.getCreator().getId().equals(currentUser.getId())) {
+      throw new RuntimeException("The home creator cannot leave. Transfer ownership or delete the home.");
+    }
+
+    home.getMembers().removeIf(u -> u.getId().equals(currentUser.getId()));
+    homeRepository.save(home);
+  }
+
+  /**
+   * Verifies the current user is a member of the given home.
+   */
+  private void verifyMembership(Home home) throws AccountNotFoundException {
+    User currentUser = getUserDetails();
+    boolean isMember = home.getMembers().stream()
+        .anyMatch(m -> m.getId().equals(currentUser.getId()));
+    if (!isMember) {
+      throw new RuntimeException("You are not a member of this home");
+    }
+  }
 
   private User getUserDetails() throws AccountNotFoundException {
     User userDetails = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();

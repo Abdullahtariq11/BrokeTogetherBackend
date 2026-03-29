@@ -10,10 +10,10 @@ public class BrokeTogetherBackendApplication {
 
   public static void main(String[] args) {
 
- // This is the "Bridge" that connects your .env file to Spring's ${} placeholders
+    // This is the "Bridge" that connects your .env file to Spring's ${} placeholders
     Dotenv dotenv = Dotenv.configure()
-            .ignoreIfMissing()
-            .load();
+        .ignoreIfMissing()
+        .load();
 
     // This line manually pushes the variables into the system so Spring can find them
     dotenv.entries().forEach(entry -> System.setProperty(entry.getKey(), entry.getValue()));
