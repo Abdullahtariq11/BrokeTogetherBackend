@@ -1,5 +1,6 @@
 package com.broketogether.api.service;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -29,6 +30,12 @@ public class HomeService {
     this.userRepository = userRepository;
   }
 
+  /**
+   * Creates Home for the user.
+   * @param name of the house
+   *
+   * @return HomeResponse entity
+   */
   @Transactional
   public HomeResponse createHome(String name) throws AccountNotFoundException {
     User userDetails = getUserDetails();
@@ -55,6 +62,11 @@ public class HomeService {
         homeCreated.getInviteCode());
   }
 
+  /**
+   * Remove members from home
+   * @param homeId home id from user being removed
+   * @param memberId member's id who is being removed.
+   */
   @Transactional
   public void removeMembers(Long homeId, Long memberId) throws AccountNotFoundException {
     Home home = homeRepository.findById(homeId)
@@ -154,12 +166,31 @@ public class HomeService {
     verifyMembership(home);
 
     if (home.getCreator().getId().equals(currentUser.getId())) {
-      throw new RuntimeException("The home creator cannot leave. Transfer ownership or delete the home.");
+      changeOwnerShip(home,currentUser);
     }
 
     home.getMembers().removeIf(u -> u.getId().equals(currentUser.getId()));
     homeRepository.save(home);
   }
+
+
+  private void changeOwnerShip(Home home,User currentUser){
+    if(home==null){
+      throw new RuntimeException("Home does not exist.");
+    }
+    if(currentUser==null){
+      throw new RuntimeException("User does not exist.");
+
+    }
+    User member = home
+            .getMembers()
+            .stream()
+            .filter(u -> !u.getId().equals(currentUser.getId()))
+            .findFirst().orElseThrow(() -> new RuntimeException("No other member exists. Please delete the home instead."));
+
+    home.setCreator(member);
+  }
+
 
   /**
    * Verifies the current user is a member of the given home.

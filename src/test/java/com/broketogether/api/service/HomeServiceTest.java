@@ -414,7 +414,7 @@ public class HomeServiceTest {
       Home home = new Home();
       home.setId(1L);
       home.setName("Home");
-      home.setCreator(otherUser); // testUser is NOT the creator
+      home.setCreator(otherUser);
       home.setMembers(new HashSet<>(Set.of(testUser, otherUser)));
 
       when(homeRepository.findById(1L)).thenReturn(Optional.of(home));
@@ -426,28 +426,47 @@ public class HomeServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when creator tries to leave")
-    void shouldThrowExceptionWhenCreatorTriesToLeave() {
+    @DisplayName("Should transfer ownership and remove creator when creator leaves")
+    void shouldTransferOwnershipWhenCreatorLeaves() throws AccountNotFoundException {
       Home home = new Home();
       home.setId(1L);
       home.setName("Home");
-      home.setCreator(testUser); // testUser IS the creator
+      home.setCreator(testUser);
       home.setMembers(new HashSet<>(Set.of(testUser, otherUser)));
 
       when(homeRepository.findById(1L)).thenReturn(Optional.of(home));
 
-      RuntimeException exception = assertThrows(RuntimeException.class,
-          () -> homeService.leaveHome(1L));
-      assertTrue(exception.getMessage().contains("creator cannot leave"));
+      assertDoesNotThrow(() -> homeService.leaveHome(1L));
+
+      // Creator should be removed from members
+      assertFalse(home.getMembers().stream().anyMatch(u -> u.getId().equals(testUser.getId())));
+      // Ownership should be transferred to otherUser
+      assertEquals(otherUser.getId(), home.getCreator().getId());
+      verify(homeRepository, times(1)).save(home);
     }
 
     @Test
-    @DisplayName("Should throw exception when user is not a member")
+    @DisplayName("Should throw when creator is the only member")
+    void shouldThrowWhenCreatorIsOnlyMember() {
+      Home home = new Home();
+      home.setId(1L);
+      home.setCreator(testUser);
+      home.setMembers(new HashSet<>(Set.of(testUser)));
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(home));
+
+      RuntimeException exception = assertThrows(RuntimeException.class,
+              () -> homeService.leaveHome(1L));
+      assertTrue(exception.getMessage().contains("No other member exists"));
+    }
+
+    @Test
+    @DisplayName("Should throw when user is not a member")
     void shouldThrowExceptionWhenNotMember() {
       Home home = new Home();
       home.setId(1L);
       home.setCreator(otherUser);
-      home.setMembers(new HashSet<>(Set.of(otherUser))); // testUser not in home
+      home.setMembers(new HashSet<>(Set.of(otherUser)));
 
       when(homeRepository.findById(1L)).thenReturn(Optional.of(home));
 
@@ -455,7 +474,7 @@ public class HomeServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when home not found")
+    @DisplayName("Should throw when home not found")
     void shouldThrowExceptionWhenHomeNotFound() {
       when(homeRepository.findById(999L)).thenReturn(Optional.empty());
 
