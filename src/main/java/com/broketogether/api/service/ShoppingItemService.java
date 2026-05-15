@@ -19,8 +19,6 @@ public class ShoppingItemService {
         this.userRepository=userRepository;
     }
 
-    @Transactional
-    public
 
 
 }
