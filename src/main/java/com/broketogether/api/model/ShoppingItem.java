@@ -46,13 +46,13 @@ public class ShoppingItem {
 
     public ShoppingItem(LocalDateTime createdAt, Home home, User checkedBy, User addedBy,
                         Boolean isChecked, BigDecimal price, String name) {
+        this.name = name;
+        this.price = price;
         this.createdAt = createdAt;
         this.home = home;
         this.checkedBy = checkedBy;
         this.addedBy = addedBy;
         this.isChecked = isChecked;
-        this.price = price;
-        this.name = name;
     }
 
     public void setId(Long id) {
