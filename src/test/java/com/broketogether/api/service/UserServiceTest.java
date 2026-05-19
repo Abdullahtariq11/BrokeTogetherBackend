@@ -21,6 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.ExpenseRepository;
 import com.broketogether.api.repository.HomeRepository;
+import com.broketogether.api.repository.ShoppingItemRepository;
 import com.broketogether.api.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,11 +39,14 @@ public class UserServiceTest {
   @Mock
   private ExpenseRepository expenseRepository;
 
+  @Mock
+  private ShoppingItemRepository shoppingItemRepository;
+
   private UserService userService;
 
   @BeforeEach
   void setUp() throws Exception {
-    userService = new UserService(userRepository, passwordEncoder, homeRepository, expenseRepository);
+    userService = new UserService(userRepository, passwordEncoder, homeRepository, expenseRepository, shoppingItemRepository);
   }
 
   // ==================== Constructor Tests ====================
@@ -55,7 +59,7 @@ public class UserServiceTest {
     @DisplayName("Should throw exception when repository is null")
     void shouldThrowExceptionWhenRepositoryIsNull() {
       Exception exception = assertThrows(Exception.class,
-          () -> new UserService(null, passwordEncoder, homeRepository, expenseRepository));
+          () -> new UserService(null, passwordEncoder, homeRepository, expenseRepository, shoppingItemRepository));
 
       assertEquals("Repository cannot be null", exception.getMessage());
     }
@@ -63,7 +67,7 @@ public class UserServiceTest {
     @Test
     @DisplayName("Should create service when repository is provided")
     void shouldCreateServiceWhenRepositoryProvided() {
-      assertDoesNotThrow(() -> new UserService(userRepository, passwordEncoder, homeRepository, expenseRepository));
+      assertDoesNotThrow(() -> new UserService(userRepository, passwordEncoder, homeRepository, expenseRepository, shoppingItemRepository));
     }
   }
 
