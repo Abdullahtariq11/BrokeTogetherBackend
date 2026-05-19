@@ -186,9 +186,12 @@ public class ExpenseService extends Utility {
             new ExpenseSplitResponse(split.getId(), split.getAmount()));
       }
 
-      // Use your constructor for a cleaner look
       ExpenseResponse response = new ExpenseResponse(expense.getId(), expense.getAmount(),
           expense.getDescription(), expense.getCategory(), splitResponses);
+      if (expense.getPayer() != null) {
+        response.setPayerId(expense.getPayer().getId());
+        response.setPayerName(expense.getPayer().getName());
+      }
 
       expenseResponses.add(response);
     }
