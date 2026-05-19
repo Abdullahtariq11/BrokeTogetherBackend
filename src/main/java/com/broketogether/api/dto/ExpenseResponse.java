@@ -17,6 +17,9 @@ public class ExpenseResponse {
 
   private String Category;
 
+  private Long payerId;
+
+  private String payerName;
 
   Map<Long, ExpenseSplitResponse> splits = new HashMap<>();
 
@@ -94,6 +97,22 @@ public class ExpenseResponse {
    */
   public void setCategory(String category) {
     Category = category;
+  }
+
+  public Long getPayerId() {
+    return payerId;
+  }
+
+  public void setPayerId(Long payerId) {
+    this.payerId = payerId;
+  }
+
+  public String getPayerName() {
+    return payerName;
+  }
+
+  public void setPayerName(String payerName) {
+    this.payerName = payerName;
   }
 
   /**
