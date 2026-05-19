@@ -29,8 +29,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
   private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
   private Bucket createNewBucket() {
-    // 30 requests per minute per IP
-    Bandwidth limit = Bandwidth.classic(30, Refill.greedy(30, Duration.ofMinutes(1)));
+    // 300 requests per minute per IP (5 req/sec burst tolerance)
+    // React StrictMode double-invokes effects in dev, and a dashboard load
+    // fires several parallel requests — 30/min was far too restrictive.
+    Bandwidth limit = Bandwidth.classic(300, Refill.greedy(300, Duration.ofMinutes(1)));
     return Bucket.builder().addLimit(limit).build();
   }
 
