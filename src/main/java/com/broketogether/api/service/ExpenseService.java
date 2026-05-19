@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 import javax.security.auth.login.AccountNotFoundException;
 
+import com.broketogether.api.utility.Utility;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +30,7 @@ import com.broketogether.api.repository.HomeRepository;
 import com.broketogether.api.repository.UserRepository;
 
 @Service
-public class ExpenseService {
+public class ExpenseService extends Utility {
 
   private final ExpenseRepository expenseRepository;
   private final UserRepository userRepository;
@@ -54,15 +55,10 @@ public class ExpenseService {
       throws AccountNotFoundException {
     User userDetails = getUserDetails();
     Home home = homeRepository.findById(expenseRequest.getHomeId())
-        .orElseThrow(() -> new RuntimeException("Home with this id doesnot exist."));
+        .orElseThrow(() -> new RuntimeException("Home with this id does not exist."));
 
     // Check if any member in the home has an ID matching the current user's ID
-    boolean isMember = home.getMembers().stream()
-        .anyMatch(member -> member.getId().equals(userDetails.getId()));
-
-    if (!isMember) {
-      throw new RuntimeException("You are not a member of this home");
-    }
+    checkUserMemberOfHome(home,userDetails);
 
     Expense expense = new Expense();
     expense.setAmount(expenseRequest.getAmount());
@@ -101,7 +97,7 @@ public class ExpenseService {
   }
 
   /**
-   * Create an espense and divide it among user defined in the parameter
+   * Create an expense and divide it among user defined in the parameter
    *
    * @param expenseRequest
    * @return
@@ -113,15 +109,10 @@ public class ExpenseService {
 
     User userDetails = getUserDetails();
     Home home = homeRepository.findById(expenseRequest.getHomeId())
-        .orElseThrow(() -> new RuntimeException("Home with this id doesnot exist."));
+        .orElseThrow(() -> new RuntimeException("Home with this id does not exist."));
 
     // Check if any member in the home has an ID matching the current user's ID
-    boolean isMember = home.getMembers().stream()
-        .anyMatch(member -> member.getId().equals(userDetails.getId()));
-
-    if (!isMember) {
-      throw new RuntimeException("You are not a member of this home");
-    }
+    checkUserMemberOfHome(home,userDetails);
 
     if (home.getMembers().size() <= 1) {
       throw new RuntimeException("Not enough members in the home to split.");
@@ -181,12 +172,8 @@ public class ExpenseService {
     Home home = homeRepository.findById(homeId)
         .orElseThrow(() -> new RuntimeException("Home not found."));
 
-    boolean isMember = home.getMembers().stream()
-        .anyMatch(member -> member.getId().equals(userDetails.getId()));
-
-    if (!isMember) {
-      throw new RuntimeException("You are not a member of this home");
-    }
+    // Check if any member in the home has an ID matching the current user's ID
+    checkUserMemberOfHome(home,userDetails);
 
     List<Expense> expenses = expenseRepository.findByHomeId(homeId);
     List<ExpenseResponse> expenseResponses = new ArrayList<>();
@@ -216,12 +203,8 @@ public class ExpenseService {
 
     User userDetails = getUserDetails();
 
-    boolean isMember = expense.getHome().getMembers().stream()
-        .anyMatch(member -> member.getId().equals(userDetails.getId()));
-
-    if (!isMember) {
-      throw new RuntimeException("You are not a member of this home");
-    }
+    // Check if any member in the home has an ID matching the current user's ID
+    checkUserMemberOfHome(expense.getHome(),userDetails);
 
     Map<Long, ExpenseSplitResponse> splitResponses = expense.getSplits().stream()
         .collect(Collectors.toMap(split -> split.getUser().getId(),
@@ -237,11 +220,8 @@ public class ExpenseService {
     Home home = homeRepository.findById(homeId)
         .orElseThrow(() -> new RuntimeException("Home not found."));
 
-    boolean isMember = home.getMembers().stream()
-        .anyMatch(member -> member.getId().equals(userDetails.getId()));
-    if (!isMember) {
-      throw new RuntimeException("You are not a member of this home");
-    }
+    // Check if any member in the home has an ID matching the current user's ID
+    checkUserMemberOfHome(home,userDetails);
 
     Map<Long, BigDecimal> balances = new HashMap<>();
     for (User member : home.getMembers()) {
@@ -288,6 +268,36 @@ public class ExpenseService {
   }
 
   /**
+   * Creates a personal expense with no splits — only records what the payer spent.
+   *
+   * @param amount      amount paid
+   * @param description item name / description
+   * @param homeId      home the expense belongs to
+   * @return ExpenseResponse with empty splits map
+   */
+  @Transactional
+  public ExpenseResponse createPersonalExpense(BigDecimal amount, String description, Long homeId)
+      throws AccountNotFoundException {
+    User payer = getUserDetails();
+    Home home = homeRepository.findById(homeId)
+        .orElseThrow(() -> new RuntimeException("Home not found."));
+    checkUserMemberOfHome(home, payer);
+
+    Expense expense = new Expense();
+    expense.setAmount(amount);
+    expense.setDescription(description);
+    expense.setCategory("SHOPPING");
+    expense.setHome(home);
+    expense.setPayer(payer);
+    expense.setSplits(new ArrayList<>());
+
+    Expense saved = expenseRepository.save(expense);
+
+    return new ExpenseResponse(saved.getId(), saved.getAmount(),
+        saved.getDescription(), saved.getCategory(), Map.of());
+  }
+
+  /**
    * Records a direct payment from the logged-in user to another member.
    * This effectively reduces the debt between them.
    */
@@ -330,16 +340,7 @@ public class ExpenseService {
         saved.getDescription(), saved.getCategory(), splitResponses);
   }
 
-  /**
-   * @return User logged in
-   * @throws AccountNotFoundException
-   */
-  private User getUserDetails() throws AccountNotFoundException {
-    User userDetails = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    if (userDetails == null) {
-      throw new AccountNotFoundException("User not found");
-    }
-    return userDetails;
-  }
+
+
 
 }

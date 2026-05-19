@@ -17,7 +17,7 @@ public class ExpenseResponse {
 
   private String Category;
 
-  // <user_id,expens_id
+
   Map<Long, ExpenseSplitResponse> splits = new HashMap<>();
 
   public ExpenseResponse() {
