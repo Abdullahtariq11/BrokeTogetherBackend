@@ -9,5 +9,6 @@ public record ItemResponse(Long id,
                            Boolean isChecked,
                            String addedByName,
                            String checkedByName,
-                           LocalDateTime createdAt) {
+                           LocalDateTime createdAt,
+                           Boolean convertedToExpense) {
 }
