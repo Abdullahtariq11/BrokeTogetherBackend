@@ -54,7 +54,7 @@ public class HomeControllerTest {
     @Test
     @DisplayName("Should create home successfully")
     void shouldCreateHomeSuccessfully() throws Exception {
-      HomeResponse response = new HomeResponse(1L, "My Apartment", "ABC12345");
+      HomeResponse response = new HomeResponse(1L, "My Apartment", "ABC12345", null);
       when(homeService.createHome("My Apartment")).thenReturn(response);
 
       mockMvc.perform(post("/api/v1/homes")
@@ -94,7 +94,7 @@ public class HomeControllerTest {
     @Test
     @DisplayName("Should join home successfully")
     void shouldJoinHomeSuccessfully() throws Exception {
-      HomeResponse response = new HomeResponse(1L, "Shared Flat", "INVITE01");
+      HomeResponse response = new HomeResponse(1L, "Shared Flat", "INVITE01", null);
       when(homeService.joinHome("INVITE01")).thenReturn(response);
 
       mockMvc.perform(post("/api/v1/homes/join")
@@ -136,8 +136,8 @@ public class HomeControllerTest {
     @DisplayName("Should return user homes")
     void shouldReturnUserHomes() throws Exception {
       Set<HomeResponse> homes = Set.of(
-          new HomeResponse(1L, "Home 1", "CODE1"),
-          new HomeResponse(2L, "Home 2", "CODE2"));
+          new HomeResponse(1L, "Home 1", "CODE1", null),
+          new HomeResponse(2L, "Home 2", "CODE2", null));
       when(homeService.getUserHomes()).thenReturn(homes);
 
       mockMvc.perform(get("/api/v1/homes/my-homes"))
@@ -165,7 +165,7 @@ public class HomeControllerTest {
     @Test
     @DisplayName("Should return home by ID")
     void shouldReturnHomeById() throws Exception {
-      HomeResponse response = new HomeResponse(1L, "Test Home", "TEST01");
+      HomeResponse response = new HomeResponse(1L, "Test Home", "TEST01", null);
       when(homeService.getHomeById(1L)).thenReturn(response);
 
       mockMvc.perform(get("/api/v1/homes/1"))
@@ -260,7 +260,7 @@ public class HomeControllerTest {
     @Test
     @DisplayName("Should rename home successfully")
     void shouldRenameHomeSuccessfully() throws Exception {
-      HomeResponse response = new HomeResponse(1L, "New Name", "CODE1");
+      HomeResponse response = new HomeResponse(1L, "New Name", "CODE1", null);
       when(homeService.renameHome(1L, "New Name")).thenReturn(response);
 
       mockMvc.perform(put("/api/v1/homes/1")
@@ -327,7 +327,7 @@ public class HomeControllerTest {
     @Test
     @DisplayName("Should return invite code")
     void shouldReturnInviteCode() throws Exception {
-      HomeResponse response = new HomeResponse(1L, "Test Home", "ABC12345");
+      HomeResponse response = new HomeResponse(1L, "Test Home", "ABC12345", null);
       when(homeService.getHomeById(1L)).thenReturn(response);
 
       mockMvc.perform(get("/api/v1/homes/1/invite-code"))
