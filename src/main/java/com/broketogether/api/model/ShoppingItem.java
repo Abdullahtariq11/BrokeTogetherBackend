@@ -20,12 +20,24 @@ public class ShoppingItem {
     @Column(nullable = true, precision = 10, scale = 2)
     private BigDecimal price;
 
+    @Column(nullable = false)
     private Boolean isChecked;
+
+    @Column(nullable = false)
+    private Boolean convertedToExpense;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "addedBy_id", nullable = false)
     @JsonIgnore
     private User addedBy;
+
+    public Boolean getConvertedToExpense() {
+        return convertedToExpense;
+    }
+
+    public void setConvertedToExpense(Boolean convertedToExpense) {
+        this.convertedToExpense = convertedToExpense;
+    }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "checkedBy_id", nullable = true)
@@ -53,6 +65,7 @@ public class ShoppingItem {
         this.checkedBy = checkedBy;
         this.addedBy = addedBy;
         this.isChecked = isChecked;
+        this.convertedToExpense=false;
     }
 
     public void setId(Long id) {
