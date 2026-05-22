@@ -5,11 +5,21 @@ public class HomeResponse {
   public Long id;
   public String name;
   public String inviteCode;
+  public Long creatorId;
 
-  public HomeResponse(Long id, String name, String inviteCode) {
+  public HomeResponse(Long id, String name, String inviteCode, Long creatorId) {
     this.id = id;
     this.name = name;
     this.inviteCode = inviteCode;
+    this.creatorId = creatorId;
+  }
+
+  public Long getCreatorId() {
+    return creatorId;
+  }
+
+  public void setCreatorId(Long creatorId) {
+    this.creatorId = creatorId;
   }
 
   /**

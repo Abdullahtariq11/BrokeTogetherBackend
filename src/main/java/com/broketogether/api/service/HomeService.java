@@ -1,6 +1,5 @@
 package com.broketogether.api.service;
 
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -48,7 +47,7 @@ public class HomeService {
     home.getMembers().add(userDetails);
     Home homeCreated = homeRepository.save(home);
     return new HomeResponse(homeCreated.getId(), homeCreated.getName(),
-        homeCreated.getInviteCode());
+        homeCreated.getInviteCode(),homeCreated.getCreator().getId());
   }
 
   @Transactional
@@ -59,7 +58,7 @@ public class HomeService {
     home.getMembers().add(userDetails);
     Home homeCreated = homeRepository.save(home);
     return new HomeResponse(homeCreated.getId(), homeCreated.getName(),
-        homeCreated.getInviteCode());
+        homeCreated.getInviteCode(),homeCreated.getCreator().getId());
   }
 
   /**
@@ -94,7 +93,7 @@ public class HomeService {
     Set<Home> homes = homeRepository.findByMembersContaining(currentUser);
 
     return homes.stream()
-        .map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode()))
+        .map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode(),h.getCreator().getId()))
         .collect(Collectors.toSet());
   }
 
@@ -121,7 +120,7 @@ public class HomeService {
     Set<Home> homes = homeRepository.findByCreatorId(currentUser.getId());
 
     return homes.stream()
-        .map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode()))
+        .map(h -> new HomeResponse(h.getId(), h.getName(), h.getInviteCode(),h.getCreator().getId()))
         .collect(Collectors.toSet());
   }
 
@@ -133,7 +132,7 @@ public class HomeService {
     Home home = homeRepository.findById(homeId)
         .orElseThrow(() -> new RuntimeException("Home not found"));
     verifyMembership(home);
-    return new HomeResponse(home.getId(), home.getName(), home.getInviteCode());
+    return new HomeResponse(home.getId(), home.getName(), home.getInviteCode(),home.getCreator().getId());
   }
 
   /**
@@ -151,7 +150,7 @@ public class HomeService {
 
     home.setName(newName);
     Home saved = homeRepository.save(home);
-    return new HomeResponse(saved.getId(), saved.getName(), saved.getInviteCode());
+    return new HomeResponse(saved.getId(), saved.getName(), saved.getInviteCode(),saved.getCreator().getId());
   }
 
   /**
