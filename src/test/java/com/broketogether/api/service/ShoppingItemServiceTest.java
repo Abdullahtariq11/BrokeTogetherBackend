@@ -1,5 +1,7 @@
 package com.broketogether.api.service;
 
+import com.broketogether.api.dto.ExpenseRequest;
+import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ItemRequest;
 import com.broketogether.api.dto.ItemResponse;
 import com.broketogether.api.model.Home;
@@ -33,6 +35,9 @@ class ShoppingItemServiceTest {
 
     @Mock
     private HomeRepository homeRepository;
+
+    @Mock
+    private ExpenseService expenseService;
 
     @Mock
     private SecurityContext securityContext;
@@ -295,35 +300,88 @@ class ShoppingItemServiceTest {
     }
 
     // ─── Convert to Expense ───────────────────────────────────────────────────
-    // Stubs — convertToExpense not yet implemented in service
 
-    @Test
-    @DisplayName("Should create expense split equally among all members when split is true")
-    void shouldCreateExpenseWithSplitsWhenSplitIsTrue() {
-        fail("Implement once convertToExpense is added to service");
-    }
+    @Nested
+    @DisplayName("convertToExpense")
+    class ConvertToExpenseTests {
 
-    @Test
-    @DisplayName("Should create personal expense with no splits when split is false")
-    void shouldCreateExpenseWithNoSplitsWhenSplitIsFalse() {
-        fail("Implement once convertToExpense is added to service");
-    }
+        @Test
+        @DisplayName("Should create expense split equally among all members when split is true")
+        void shouldCreateExpenseWithSplitsWhenSplitIsTrue() throws Exception {
+            testItem.setChecked(true);
 
-    @Test
-    @DisplayName("Should throw exception when item is not checked before converting")
-    void shouldThrowWhenItemNotCheckedOnConvert() {
-        fail("Implement once convertToExpense is added to service");
-    }
+            ExpenseResponse mockExpenseResponse = new ExpenseResponse(
+                    1L, new BigDecimal("10.00"), "Milk", "SHOPPING", Map.of());
 
-    @Test
-    @DisplayName("Should throw exception when item is not found on convert")
-    void shouldThrowWhenItemNotFoundOnConvert() {
-        fail("Implement once convertToExpense is added to service");
-    }
+            when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
+            when(expenseService.createExpense(any(ExpenseRequest.class))).thenReturn(mockExpenseResponse);
 
-    @Test
-    @DisplayName("Should throw exception when user is not a member of the home on convert")
-    void shouldThrowWhenUserIsNotMemberOnConvert() {
-        fail("Implement once convertToExpense is added to service");
+            ExpenseResponse result = shoppingItemService.convertToExpense(1L, true);
+
+            assertNotNull(result);
+            assertEquals("SHOPPING", result.getCategory());
+            verify(expenseService, times(1)).createExpense(any(ExpenseRequest.class));
+            verify(expenseService, never()).createPersonalExpense(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Should create personal expense with no splits when split is false")
+        void shouldCreateExpenseWithNoSplitsWhenSplitIsFalse() throws Exception {
+            testItem.setChecked(true);
+
+            ExpenseResponse mockExpenseResponse = new ExpenseResponse(
+                    1L, new BigDecimal("10.00"), "Milk", "SHOPPING", Map.of());
+
+            when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
+            when(expenseService.createPersonalExpense(any(BigDecimal.class), any(String.class), any(Long.class)))
+                    .thenReturn(mockExpenseResponse);
+
+            ExpenseResponse result = shoppingItemService.convertToExpense(1L, false);
+
+            assertNotNull(result);
+            verify(expenseService, times(1)).createPersonalExpense(
+                    new BigDecimal("10.00"), "Milk", testHome.getId());
+            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should throw exception when item is not checked before converting")
+        void shouldThrowWhenItemNotCheckedOnConvert() throws AccountNotFoundException {
+            // testItem.isChecked == false by default from setUp
+            when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
+
+            RuntimeException ex = assertThrows(RuntimeException.class,
+                    () -> shoppingItemService.convertToExpense(1L, true));
+            assertEquals("Item must be checked before converting to an expense.", ex.getMessage());
+            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should throw exception when item is not found on convert")
+        void shouldThrowWhenItemNotFoundOnConvert() throws AccountNotFoundException {
+            when(shoppingItemRepository.findById(999L)).thenReturn(Optional.empty());
+
+            RuntimeException ex = assertThrows(RuntimeException.class,
+                    () -> shoppingItemService.convertToExpense(999L, true));
+            assertEquals("No shopping Item found with this id.", ex.getMessage());
+            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should throw exception when user is not a member of the home on convert")
+        void shouldThrowWhenUserIsNotMemberOnConvert() throws AccountNotFoundException {
+            Home homeWithoutUser = new Home();
+            homeWithoutUser.setId(2L);
+            homeWithoutUser.setMembers(new HashSet<>(Set.of(otherUser)));
+            testItem.setHome(homeWithoutUser);
+            testItem.setChecked(true);
+
+            when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
+
+            RuntimeException ex = assertThrows(RuntimeException.class,
+                    () -> shoppingItemService.convertToExpense(1L, true));
+            assertEquals("You are not a member of this home", ex.getMessage());
+            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
+        }
     }
 }
