@@ -128,7 +128,7 @@ public class ExpenseServiceTest {
 
       RuntimeException exception = assertThrows(RuntimeException.class,
           () -> expenseService.createExpense(request));
-      assertEquals("Home with this id doesnot exist.", exception.getMessage());
+      assertEquals("Home with this id does not exist.", exception.getMessage());
     }
 
     @Test
