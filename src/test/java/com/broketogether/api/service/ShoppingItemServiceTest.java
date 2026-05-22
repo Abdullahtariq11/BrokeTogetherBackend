@@ -352,7 +352,7 @@ class ShoppingItemServiceTest {
 
         @Test
         @DisplayName("Should throw exception when item is already converted to an expense")
-        void shouldThrowWhenItemAlreadyConverted() {
+        void shouldThrowWhenItemAlreadyConverted() throws AccountNotFoundException {
             testItem.setChecked(true);
             testItem.setConvertedToExpense(true);
 
