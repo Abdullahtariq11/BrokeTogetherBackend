@@ -314,12 +314,15 @@ class ShoppingItemServiceTest {
                     1L, new BigDecimal("10.00"), "Milk", "SHOPPING", Map.of());
 
             when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
+            when(shoppingItemRepository.save(any(ShoppingItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(expenseService.createExpense(any(ExpenseRequest.class))).thenReturn(mockExpenseResponse);
 
             ExpenseResponse result = shoppingItemService.convertToExpense(1L, true);
 
             assertNotNull(result);
             assertEquals("SHOPPING", result.getCategory());
+            assertTrue(testItem.getConvertedToExpense());
+            verify(shoppingItemRepository, times(1)).save(testItem);
             verify(expenseService, times(1)).createExpense(any(ExpenseRequest.class));
             verify(expenseService, never()).createPersonalExpense(any(), any(), any());
         }
@@ -333,14 +336,32 @@ class ShoppingItemServiceTest {
                     1L, new BigDecimal("10.00"), "Milk", "SHOPPING", Map.of());
 
             when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
+            when(shoppingItemRepository.save(any(ShoppingItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(expenseService.createPersonalExpense(any(BigDecimal.class), any(String.class), any(Long.class)))
                     .thenReturn(mockExpenseResponse);
 
             ExpenseResponse result = shoppingItemService.convertToExpense(1L, false);
 
             assertNotNull(result);
+            assertTrue(testItem.getConvertedToExpense());
+            verify(shoppingItemRepository, times(1)).save(testItem);
             verify(expenseService, times(1)).createPersonalExpense(
                     new BigDecimal("10.00"), "Milk", testHome.getId());
+            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should throw exception when item is already converted to an expense")
+        void shouldThrowWhenItemAlreadyConverted() {
+            testItem.setChecked(true);
+            testItem.setConvertedToExpense(true);
+
+            when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
+
+            RuntimeException ex = assertThrows(RuntimeException.class,
+                    () -> shoppingItemService.convertToExpense(1L, true));
+            assertEquals("Item already converted to expense.", ex.getMessage());
+            verify(shoppingItemRepository, never()).save(any());
             verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
         }
 

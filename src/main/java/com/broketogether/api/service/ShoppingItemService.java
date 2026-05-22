@@ -51,7 +51,7 @@ public class ShoppingItemService extends Utility {
         return new ItemResponse(shoppingItem.getId(), shoppingItem.getName(), shoppingItem.getPrice(),
                 shoppingItem.getChecked(), shoppingItem.getAddedBy().getName(),
                 shoppingItem.getCheckedBy() != null ? shoppingItem.getCheckedBy().getName() : null,
-                shoppingItem.getCreatedAt());
+                shoppingItem.getCreatedAt(),shoppingItem.getConvertedToExpense());
     }
 
     /**
@@ -70,7 +70,7 @@ public class ShoppingItemService extends Utility {
         return new ItemResponse(shoppingItem.getId(), shoppingItem.getName(), shoppingItem.getPrice(),
                 shoppingItem.getChecked(), shoppingItem.getAddedBy().getName(),
                 shoppingItem.getCheckedBy() != null ? shoppingItem.getCheckedBy().getName() : null,
-                shoppingItem.getCreatedAt());
+                shoppingItem.getCreatedAt(),shoppingItem.getConvertedToExpense());
     }
 
     /**
@@ -91,7 +91,7 @@ public class ShoppingItemService extends Utility {
             ItemResponse itemResponse = new ItemResponse(shoppingItem.getId(), shoppingItem.getName(), shoppingItem.getPrice(),
                     shoppingItem.getChecked(), shoppingItem.getAddedBy().getName(),
                     shoppingItem.getCheckedBy() != null ? shoppingItem.getCheckedBy().getName() : null,
-                    shoppingItem.getCreatedAt());
+                    shoppingItem.getCreatedAt(),shoppingItem.getConvertedToExpense());
             items.add(itemResponse);
         }
         return items;
@@ -133,7 +133,7 @@ public class ShoppingItemService extends Utility {
         return new ItemResponse(shoppingItem.getId(), shoppingItem.getName(), shoppingItem.getPrice(),
                 shoppingItem.getChecked(), shoppingItem.getAddedBy().getName(),
                 shoppingItem.getCheckedBy() != null ? shoppingItem.getCheckedBy().getName() : null,
-                shoppingItem.getCreatedAt());
+                shoppingItem.getCreatedAt(),shoppingItem.getConvertedToExpense());
     }
 
     /**
@@ -161,7 +161,7 @@ public class ShoppingItemService extends Utility {
         return new ItemResponse(shoppingItem.getId(), shoppingItem.getName(), shoppingItem.getPrice(),
                 shoppingItem.getChecked(), shoppingItem.getAddedBy().getName(),
                 shoppingItem.getCheckedBy() != null ? shoppingItem.getCheckedBy().getName() : null,
-                shoppingItem.getCreatedAt());
+                shoppingItem.getCreatedAt(),shoppingItem.getConvertedToExpense());
     }
 
     /**
@@ -179,12 +179,18 @@ public class ShoppingItemService extends Utility {
         User userDetails = getUserDetails();
         checkUserMemberOfHome(shoppingItem.getHome(), userDetails);
 
+        if(shoppingItem.getConvertedToExpense()){
+            throw new RuntimeException("Item already converted to expense.");
+        }
         if (!shoppingItem.getChecked()) {
             throw new RuntimeException("Item must be checked before converting to an expense.");
         }
         if (shoppingItem.getPrice() == null) {
             throw new RuntimeException("Item must have a price to be converted to an expense.");
         }
+
+        shoppingItem.setConvertedToExpense(true);
+        shoppingItemRepository.save(shoppingItem);
 
         if (split) {
             ExpenseRequest request = new ExpenseRequest(
