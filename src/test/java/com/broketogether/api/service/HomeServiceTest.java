@@ -105,6 +105,7 @@ public class HomeServiceTest {
       home.setId(1L);
       home.setName("Shared Flat");
       home.setInviteCode("INVITE01");
+      home.setCreator(otherUser);
       home.setMembers(new HashSet<>(Set.of(otherUser)));
 
       when(homeRepository.findByInviteCode("INVITE01")).thenReturn(Optional.of(home));
@@ -225,11 +226,13 @@ public class HomeServiceTest {
       home1.setId(1L);
       home1.setName("Home 1");
       home1.setInviteCode("CODE1");
+      home1.setCreator(testUser);
 
       Home home2 = new Home();
       home2.setId(2L);
       home2.setName("Home 2");
       home2.setInviteCode("CODE2");
+      home2.setCreator(testUser);
 
       when(homeRepository.findByMembersContaining(testUser))
           .thenReturn(Set.of(home1, home2));
@@ -311,6 +314,7 @@ public class HomeServiceTest {
       home.setId(1L);
       home.setName("Test Home");
       home.setInviteCode("TEST01");
+      home.setCreator(testUser);
       home.setMembers(new HashSet<>(Set.of(testUser)));
 
       when(homeRepository.findById(1L)).thenReturn(Optional.of(home));
