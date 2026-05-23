@@ -12,15 +12,12 @@ import java.util.stream.Collectors;
 
 import javax.security.auth.login.AccountNotFoundException;
 
+import com.broketogether.api.dto.*;
 import com.broketogether.api.utility.Utility;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.broketogether.api.dto.ExpenseRequest;
-import com.broketogether.api.dto.ExpenseResponse;
-import com.broketogether.api.dto.ExpenseSplitResponse;
-import com.broketogether.api.dto.ExpenseWithUserRequest;
 import com.broketogether.api.model.Expense;
 import com.broketogether.api.model.ExpenseSplit;
 import com.broketogether.api.model.Home;
@@ -46,9 +43,10 @@ public class ExpenseService extends Utility {
 
   /**
    * Creates Expense for user with equal splits among users
+   * @param expenseRequest expense dto used to create expense.
    *
    * @return ExpenseResponse
-   * @throws AccountNotFoundException
+   * @throws AccountNotFoundException if there is no account
    */
   @Transactional
   public ExpenseResponse createExpense(ExpenseRequest expenseRequest)
@@ -98,10 +96,10 @@ public class ExpenseService extends Utility {
 
   /**
    * Create an expense and divide it among user defined in the parameter
+   * @param expenseRequest dto used to create expense request
    *
-   * @param expenseRequest
-   * @return
-   * @throws AccountNotFoundException
+   * @return ExpenseResponse
+   * @throws AccountNotFoundException when account is not found.
    */
   @Transactional
   public ExpenseResponse createExpense(ExpenseWithUserRequest expenseRequest)
@@ -199,6 +197,12 @@ public class ExpenseService extends Utility {
     return expenseResponses;
   }
 
+  /**
+   * Retrieves expense by id.
+   * @param expenseId id of the expense
+   *
+   * @return ExpenseResponse
+   * */
   @Transactional(readOnly = true)
   public ExpenseResponse getExpenseById(Long expenseId) throws AccountNotFoundException {
     Expense expense = expenseRepository.findById(expenseId)
@@ -217,6 +221,12 @@ public class ExpenseService extends Utility {
         expense.getCategory(), splitResponses);
   }
 
+  /**
+   * Retrieves all home expense by homeId.
+   * @param homeId id of the home
+   *
+   * @return ExpenseResponse
+   * */
   @Transactional(readOnly = true)
   public Map<Long, BigDecimal> getHomeBalances(Long homeId) throws AccountNotFoundException {
     User userDetails = getUserDetails();
@@ -256,6 +266,12 @@ public class ExpenseService extends Utility {
     return balances;
   }
 
+  /**
+   * Deletes expense using id
+   * @param expenseId id of the expense that needs to be deleted
+   *
+   * @throws AccountNotFoundException when no user account found
+   */
   @Transactional
   public void deleteExpense(Long expenseId) throws AccountNotFoundException {
     User userDetails = getUserDetails();
@@ -341,6 +357,51 @@ public class ExpenseService extends Utility {
 
     return new ExpenseResponse(saved.getId(), saved.getAmount(),
         saved.getDescription(), saved.getCategory(), splitResponses);
+  }
+
+  @Transactional(readOnly = true)
+  public List<SettlementSuggestion> getSettlements(Long homeId) throws AccountNotFoundException {
+    // 1. Get net balances (auth + membership check happens inside)
+    Map<Long, BigDecimal> netBalances = this.getHomeBalances(homeId);
+
+    // Build a name lookup map from home members
+    Home home = homeRepository.findById(homeId)
+            .orElseThrow(() -> new RuntimeException("Home not found."));
+    Map<Long, String> nameMap = home.getMembers().stream()
+            .collect(Collectors.toMap(User::getId, User::getName));
+
+    // 2. Work on a mutable copy so we don't touch the original
+    Map<Long, BigDecimal> balances = new HashMap<>(netBalances);
+    List<SettlementSuggestion> suggestions = new ArrayList<>();
+
+    // 3. Greedy min-cash-flow: each round settle the biggest debtor → biggest creditor
+    while (true) {
+      Long creditorId = null, debtorId = null;
+      BigDecimal maxCredit = BigDecimal.ZERO, maxDebt = BigDecimal.ZERO;
+
+      for (Map.Entry<Long, BigDecimal> entry : balances.entrySet()) {
+        BigDecimal val = entry.getValue();
+        if (val.compareTo(maxCredit) > 0)          { maxCredit = val;          creditorId = entry.getKey(); }
+        if (val.negate().compareTo(maxDebt) > 0)   { maxDebt   = val.negate(); debtorId   = entry.getKey(); }
+      }
+
+      // Stop when nothing meaningful remains (rounding dust < 1 cent)
+      if (creditorId == null || debtorId == null || maxCredit.compareTo(new BigDecimal("0.01")) < 0) break;
+
+      BigDecimal amount = maxCredit.min(maxDebt).setScale(2, RoundingMode.HALF_UP);
+
+      suggestions.add(new SettlementSuggestion(
+              debtorId,   nameMap.getOrDefault(debtorId,   "Unknown"),
+              creditorId, nameMap.getOrDefault(creditorId, "Unknown"),
+              amount
+      ));
+
+      // Reduce both balances by the settled amount
+      balances.put(creditorId, balances.get(creditorId).subtract(amount));
+      balances.put(debtorId,   balances.get(debtorId).add(amount));
+    }
+
+    return suggestions;
   }
 
 
