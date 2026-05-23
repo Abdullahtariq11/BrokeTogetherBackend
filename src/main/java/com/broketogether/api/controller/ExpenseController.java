@@ -6,6 +6,7 @@ import java.util.Map;
 
 import javax.security.auth.login.AccountNotFoundException;
 
+import com.broketogether.api.dto.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,10 +16,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.broketogether.api.dto.ExpenseRequest;
-import com.broketogether.api.dto.ExpenseResponse;
-import com.broketogether.api.dto.ExpenseWithUserRequest;
-import com.broketogether.api.dto.SettlementRequest;
 import com.broketogether.api.service.ExpenseService;
 
 import jakarta.validation.Valid;
@@ -74,6 +71,12 @@ public class ExpenseController {
       throws AccountNotFoundException {
     return ResponseEntity.status(201).body(
         expenseService.settleUp(request.getHomeId(), request.getPayeeId(), request.getAmount()));
+  }
+
+  @GetMapping("/home/{homeId}/settlements")
+  public ResponseEntity<List<SettlementSuggestion>> getSettlements(@PathVariable Long homeId)
+          throws AccountNotFoundException {
+    return ResponseEntity.ok(expenseService.getSettlements(homeId));
   }
 
 }
