@@ -50,11 +50,21 @@ public class HomeService {
         homeCreated.getInviteCode(),homeCreated.getCreator().getId());
   }
 
+  /**
+   * User can join home with the invite code
+   * @param inviteCode code to join home.
+   *
+   * @throws AccountNotFoundException when user account is not found,
+   * @return HomeResponse dto
+   */
   @Transactional
   public HomeResponse joinHome(String inviteCode) throws AccountNotFoundException {
     Home home = homeRepository.findByInviteCode(inviteCode)
         .orElseThrow(() -> new RuntimeException("Invalid invite code."));
     User userDetails = getUserDetails();
+    if (home.getMembers().contains(userDetails)) {
+      throw new RuntimeException("User is already a member of this home.");
+    }
     home.getMembers().add(userDetails);
     Home homeCreated = homeRepository.save(home);
     return new HomeResponse(homeCreated.getId(), homeCreated.getName(),
