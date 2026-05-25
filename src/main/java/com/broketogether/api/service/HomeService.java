@@ -1,10 +1,12 @@
 package com.broketogether.api.service;
 
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import javax.security.auth.login.AccountNotFoundException;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +50,24 @@ public class HomeService {
     Home homeCreated = homeRepository.save(home);
     return new HomeResponse(homeCreated.getId(), homeCreated.getName(),
         homeCreated.getInviteCode(),homeCreated.getCreator().getId());
+  }
+  /**
+   * Regenerate home invite code.
+   *
+   * @return HomeResponse
+   */
+  @Transactional
+  public HomeResponse regenerateCode(Long homeId) throws AccountNotFoundException {
+    Home home = homeRepository.findById(homeId)
+            .orElseThrow(() -> new EntityNotFoundException("Home with this Id not found"));
+    User userDetails = getUserDetails();
+    if (!home.getCreator().getId().equals(userDetails.getId())) {
+      throw new AccessDeniedException("User is not an admin of this home.");
+    }
+    home.setInviteCode(UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+    Home homeSaved = homeRepository.save(home);
+    return new HomeResponse(homeSaved.getId(), homeSaved.getName(),
+            homeSaved.getInviteCode(),homeSaved.getCreator().getId());
   }
 
   /**
