@@ -89,4 +89,9 @@ public class HomeController {
     return ResponseEntity.noContent().build();
   }
 
+  @PostMapping("inviteCode/{homeId}")
+  public ResponseEntity<HomeResponse> regenerateCode(@PathVariable Long homeId) throws AccountNotFoundException {
+    return ResponseEntity.ok(homeService.regenerateCode(homeId));
+  }
+
 }
