@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.broketogether.api.dto.UserResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -137,11 +138,11 @@ public class AuthControllerTest {
     @Test
     @DisplayName("Should register successfully with valid data")
     void shouldRegisterSuccessfully() throws Exception {
-      when(userService.saveUser(any(User.class))).thenReturn(new User("Test User", "test@example.com", "encoded"));
+      when(userService.saveUser(any(User.class))).thenReturn(new UserResponse((long) 100.0, "Test User", "test@example.com"));
 
       mockMvc.perform(post("/api/v1/auth/register")
               .contentType(MediaType.APPLICATION_JSON)
-              .content("{\"name\":\"Test User\",\"username\":\"test@example.com\",\"password\":\"password123\"}"))
+              .content("{\"id\":100.0,\"name\":\"Test User\",\"email\":\"test@example.com\"}"))
           .andExpect(status().isCreated())
           .andExpect(content().string("Account created successfully."));
     }

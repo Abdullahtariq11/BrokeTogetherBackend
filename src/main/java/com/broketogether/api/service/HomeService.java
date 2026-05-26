@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import javax.security.auth.login.AccountNotFoundException;
 
+import com.broketogether.api.utility.Utility;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -21,7 +22,7 @@ import com.broketogether.api.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 
 @Service
-public class HomeService {
+public class HomeService extends Utility {
 
   private final HomeRepository homeRepository;
   private final UserRepository userRepository;
@@ -233,11 +234,4 @@ public class HomeService {
     }
   }
 
-  private User getUserDetails() throws AccountNotFoundException {
-    User userDetails = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    if (userDetails == null) {
-      throw new AccountNotFoundException("User not found");
-    }
-    return userDetails;
-  }
 }
