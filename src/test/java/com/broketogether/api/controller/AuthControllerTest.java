@@ -142,7 +142,7 @@ public class AuthControllerTest {
 
       mockMvc.perform(post("/api/v1/auth/register")
               .contentType(MediaType.APPLICATION_JSON)
-              .content("{\"id\":100.0,\"name\":\"Test User\",\"email\":\"test@example.com\"}"))
+              .content("{\"name\":\"Test User\",\"username\":\"test@example.com\",\"password\":\"password123\"}"))
           .andExpect(status().isCreated())
           .andExpect(content().string("Account created successfully."));
     }
