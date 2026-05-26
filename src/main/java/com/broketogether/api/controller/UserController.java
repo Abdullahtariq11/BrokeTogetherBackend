@@ -2,13 +2,13 @@ package com.broketogether.api.controller;
 
 import javax.security.auth.login.AccountNotFoundException;
 
+import com.broketogether.api.dto.EditNameRequest;
+import com.broketogether.api.dto.PasswordResetRequest;
 import com.broketogether.api.dto.UserResponse;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.broketogether.api.model.User;
 import com.broketogether.api.service.UserService;
@@ -46,5 +46,25 @@ public class UserController {
     userService.deleteAccount();
     return ResponseEntity.noContent().build();
   }
+
+  /**
+   * Reset Password
+   *
+   */
+  @PostMapping("/password-reset")
+  public ResponseEntity<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) throws AccountNotFoundException {
+    userService.resetPassword(request.getCurrentPassword(), request.getNewPassword());
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Edit user name
+   *
+   */
+  @PutMapping("/edit")
+  public ResponseEntity<UserResponse> editName(@Valid @RequestBody EditNameRequest request) throws AccountNotFoundException {
+    return ResponseEntity.ok(userService.editUserName(request.getName()));
+  }
+
 
 }

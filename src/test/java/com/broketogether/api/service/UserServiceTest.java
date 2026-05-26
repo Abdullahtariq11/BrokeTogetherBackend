@@ -15,9 +15,16 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import org.mockito.ArgumentCaptor;
+
+import com.broketogether.api.dto.UserResponse;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.ExpenseRepository;
 import com.broketogether.api.repository.HomeRepository;
@@ -87,9 +94,11 @@ public class UserServiceTest {
 
       when(userRepository.findAll()).thenReturn(List.of(user1, user2));
 
-      List<User> users = userService.getAllUser();
+      List<UserResponse> users = userService.getAllUser();
 
       assertEquals(2, users.size());
+      assertEquals("one@example.com", users.get(0).email());
+      assertEquals("two@example.com", users.get(1).email());
       verify(userRepository, times(1)).findAll();
     }
 
@@ -98,7 +107,7 @@ public class UserServiceTest {
     void shouldReturnEmptyListWhenNoUsers() {
       when(userRepository.findAll()).thenReturn(Collections.emptyList());
 
-      List<User> users = userService.getAllUser();
+      List<UserResponse> users = userService.getAllUser();
 
       assertTrue(users.isEmpty());
       verify(userRepository, times(1)).findAll();
@@ -119,10 +128,12 @@ public class UserServiceTest {
 
       when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
 
-      Optional<User> result = userService.getUserByEmail("test@example.com");
+      Optional<UserResponse> result = userService.getUserByEmail("test@example.com");
 
       assertTrue(result.isPresent());
-      assertEquals("test@example.com", result.get().getEmail());
+      assertEquals(1L, result.get().id());
+      assertEquals("Test User", result.get().name());
+      assertEquals("test@example.com", result.get().email());
       verify(userRepository, times(1)).findByEmail("test@example.com");
     }
 
@@ -131,7 +142,7 @@ public class UserServiceTest {
     void shouldReturnEmptyWhenEmailNotFound() {
       when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
 
-      Optional<User> result = userService.getUserByEmail("missing@example.com");
+      Optional<UserResponse> result = userService.getUserByEmail("missing@example.com");
 
       assertTrue(result.isEmpty());
       verify(userRepository, times(1)).findByEmail("missing@example.com");
@@ -154,9 +165,12 @@ public class UserServiceTest {
       when(passwordEncoder.encode("rawPassword")).thenReturn("encodedPassword");
       when(userRepository.save(any(User.class))).thenReturn(user);
 
-      User saved = userService.saveUser(user);
+      UserResponse saved = userService.saveUser(user);
 
       assertNotNull(saved);
+      assertEquals(1L, saved.id());
+      assertEquals("New User", saved.name());
+      assertEquals("new@example.com", saved.email());
       verify(passwordEncoder, times(1)).encode("rawPassword");
       verify(userRepository, times(1)).save(user);
     }
@@ -184,9 +198,86 @@ public class UserServiceTest {
       when(passwordEncoder.encode("myPassword")).thenReturn("$2a$10$encodedHash");
       when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-      User saved = userService.saveUser(user);
+      userService.saveUser(user);
 
-      assertEquals("$2a$10$encodedHash", saved.getPassword());
+      ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+      verify(userRepository).save(captor.capture());
+      assertEquals("$2a$10$encodedHash", captor.getValue().getPassword());
+    }
+  }
+
+  // ==================== resetPassword Tests ====================
+
+  @Nested
+  @DisplayName("resetPassword")
+  class ResetPasswordTests {
+
+    private User mockCurrentUser() {
+      User user = new User("Test User", "test@example.com", "encodedOldPassword");
+      user.setId(1L);
+      return user;
+    }
+
+    private void mockSecurityContext(MockedStatic<SecurityContextHolder> securityHolder, User user) {
+      SecurityContext context = mock(SecurityContext.class);
+      Authentication authentication = mock(Authentication.class);
+      securityHolder.when(SecurityContextHolder::getContext).thenReturn(context);
+      when(context.getAuthentication()).thenReturn(authentication);
+      when(authentication.getPrincipal()).thenReturn(user);
+    }
+
+    @Test
+    @DisplayName("Should reset password when current password matches")
+    void shouldResetPasswordWhenCurrentPasswordMatches() throws Exception {
+      User user = mockCurrentUser();
+
+      try (MockedStatic<SecurityContextHolder> securityHolder = mockStatic(SecurityContextHolder.class)) {
+        mockSecurityContext(securityHolder, user);
+        when(passwordEncoder.matches("oldPassword", "encodedOldPassword")).thenReturn(true);
+        when(passwordEncoder.encode("newPassword")).thenReturn("encodedNewPassword");
+
+        userService.resetPassword("oldPassword", "newPassword");
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertEquals("encodedNewPassword", captor.getValue().getPassword());
+      }
+    }
+
+    @Test
+    @DisplayName("Should throw when current password does not match")
+    void shouldThrowWhenCurrentPasswordDoesNotMatch() {
+      User user = mockCurrentUser();
+
+      try (MockedStatic<SecurityContextHolder> securityHolder = mockStatic(SecurityContextHolder.class)) {
+        mockSecurityContext(securityHolder, user);
+        when(passwordEncoder.matches("wrongPassword", "encodedOldPassword")).thenReturn(false);
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> userService.resetPassword("wrongPassword", "newPassword"));
+
+        assertEquals("Password entered doesnt match current password.", exception.getMessage());
+        verify(userRepository, never()).save(any(User.class));
+      }
+    }
+
+    @Test
+    @DisplayName("Should encode new password before saving")
+    void shouldEncodeNewPasswordBeforeSaving() throws Exception {
+      User user = mockCurrentUser();
+
+      try (MockedStatic<SecurityContextHolder> securityHolder = mockStatic(SecurityContextHolder.class)) {
+        mockSecurityContext(securityHolder, user);
+        when(passwordEncoder.matches("oldPassword", "encodedOldPassword")).thenReturn(true);
+        when(passwordEncoder.encode("newPassword")).thenReturn("$2a$10$newEncodedHash");
+
+        userService.resetPassword("oldPassword", "newPassword");
+
+        verify(passwordEncoder, times(1)).encode("newPassword");
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertEquals("$2a$10$newEncodedHash", captor.getValue().getPassword());
+      }
     }
   }
 }
