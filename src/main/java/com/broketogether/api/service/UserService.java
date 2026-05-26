@@ -6,6 +6,8 @@ import java.util.Set;
 
 import javax.security.auth.login.AccountNotFoundException;
 
+import com.broketogether.api.dto.UserResponse;
+import com.broketogether.api.utility.Utility;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,7 +22,7 @@ import com.broketogether.api.repository.ShoppingItemRepository;
 import com.broketogether.api.repository.UserRepository;
 
 @Service
-public class UserService {
+public class UserService extends Utility {
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final HomeRepository homeRepository;
@@ -42,32 +44,39 @@ public class UserService {
   }
 
   /**
-   * @return
+   * @return List of users
    */
-  public List<User> getAllUser() {
-    return userRepository.findAll();
+  public List<UserResponse> getAllUser() {
+    List<User> users= userRepository.findAll();
+
+    return users.stream().map(u->new UserResponse(u.getId(),u.getName(),u.getEmail())).toList();
   }
 
   /**
-   * @param email
-   * @return
+   * @param email to find user
+   * @return UserResponse
    */
-  public Optional<User> getUserByEmail(String email) {
-    return this.userRepository.findByEmail(email);
+  public Optional<UserResponse> getUserByEmail(String email) {
+    return this.userRepository.findByEmail(email)
+            .map(u-> new UserResponse(u.getId(),u.getName(),u.getEmail()));
   }
 
   /**
-   * @param user
-   * @return
+   * Creates a user
+   * @param user details to save a user
+   *
+   * @return UserResponse
    */
-  public User saveUser(User user) {
+  public UserResponse saveUser(User user) {
     if (this.userRepository.existsByEmail(user.getEmail())) {
       throw new RuntimeException("Email already in use!");
     }
     String rawPassword = user.getPassword();
     String encodedPassword = passwordEncoder.encode(rawPassword);
     user.setPassword(encodedPassword);
-    return userRepository.save(user);
+    User savedUser= userRepository.save(user);
+
+    return new UserResponse(savedUser.getId(), savedUser.getName(), savedUser.getEmail());
   }
 
   /**
@@ -112,6 +121,41 @@ public class UserService {
     }
 
     userRepository.delete(currentUser);
+  }
+
+  /**
+   * Reset's Password
+   *
+   * @param currentPassword user's current password
+   * @param newPassword user's new password
+   */
+  public void resetPassword(String currentPassword, String newPassword) throws AccountNotFoundException {
+    User userDetails = getUserDetails();
+    if(!passwordEncoder.matches(userDetails.getPassword(),currentPassword)){
+      throw  new RuntimeException("Password entered doesnt match current password.");
+    }
+    String encodedPassword=passwordEncoder.encode(newPassword);
+    userDetails.setPassword(encodedPassword);
+    userRepository.save(userDetails);
+  }
+
+  /**
+   * Edits user name
+   * @param name new user's name
+   *
+   * @return UserResponse details
+   */
+  public UserResponse editUserName(String name) throws AccountNotFoundException {
+    User userDetails= getUserDetails();
+
+    if (name == null || name.isBlank()) {
+      throw new IllegalArgumentException("Name field cannot be empty.");
+    }
+
+    userDetails.setName(name);
+    User savedUser =userRepository.save(userDetails);
+
+    return new UserResponse(savedUser.getId(), savedUser.getName(), savedUser.getEmail());
   }
 
 }
