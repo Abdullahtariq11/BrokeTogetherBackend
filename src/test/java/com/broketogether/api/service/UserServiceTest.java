@@ -233,6 +233,7 @@ public class UserServiceTest {
 
       try (MockedStatic<SecurityContextHolder> securityHolder = mockStatic(SecurityContextHolder.class)) {
         mockSecurityContext(securityHolder, user);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("oldPassword", "encodedOldPassword")).thenReturn(true);
         when(passwordEncoder.encode("newPassword")).thenReturn("encodedNewPassword");
 
@@ -251,9 +252,10 @@ public class UserServiceTest {
 
       try (MockedStatic<SecurityContextHolder> securityHolder = mockStatic(SecurityContextHolder.class)) {
         mockSecurityContext(securityHolder, user);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrongPassword", "encodedOldPassword")).thenReturn(false);
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
             () -> userService.resetPassword("wrongPassword", "newPassword"));
 
         assertEquals("Password entered doesnt match current password.", exception.getMessage());
@@ -268,6 +270,7 @@ public class UserServiceTest {
 
       try (MockedStatic<SecurityContextHolder> securityHolder = mockStatic(SecurityContextHolder.class)) {
         mockSecurityContext(securityHolder, user);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("oldPassword", "encodedOldPassword")).thenReturn(true);
         when(passwordEncoder.encode("newPassword")).thenReturn("$2a$10$newEncodedHash");
 

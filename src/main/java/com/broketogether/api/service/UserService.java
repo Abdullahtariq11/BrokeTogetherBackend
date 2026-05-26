@@ -131,12 +131,14 @@ public class UserService extends Utility {
    */
   public void resetPassword(String currentPassword, String newPassword) throws AccountNotFoundException {
     User userDetails = getUserDetails();
-    if(!passwordEncoder.matches(userDetails.getPassword(),currentPassword)){
-      throw  new RuntimeException("Password entered doesnt match current password.");
+    // Reload fresh from DB — SecurityContext principal may not have the latest password hash
+    User freshUser = userRepository.findById(userDetails.getId())
+        .orElseThrow(() -> new AccountNotFoundException("User not found"));
+    if (!passwordEncoder.matches(currentPassword, freshUser.getPassword())) {
+      throw new IllegalArgumentException("Password entered doesnt match current password.");
     }
-    String encodedPassword=passwordEncoder.encode(newPassword);
-    userDetails.setPassword(encodedPassword);
-    userRepository.save(userDetails);
+    freshUser.setPassword(passwordEncoder.encode(newPassword));
+    userRepository.save(freshUser);
   }
 
   /**
