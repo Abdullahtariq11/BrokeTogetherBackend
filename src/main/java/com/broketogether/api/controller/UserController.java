@@ -2,6 +2,7 @@ package com.broketogether.api.controller;
 
 import javax.security.auth.login.AccountNotFoundException;
 
+import com.broketogether.api.dto.UserResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,11 +27,12 @@ public class UserController {
    * Get the current authenticated user's profile.
    *
    * @param currentUser The authenticated user (automatically injected by Spring)
-   * @return ResponseEntity with the current user's profile
+   * @return UserResponse with the current user's profile
    */
   @GetMapping("/me")
-  public ResponseEntity<User> getCurrentUser(@AuthenticationPrincipal User currentUser) {
-    return ResponseEntity.ok(currentUser);
+  public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal User currentUser) {
+
+    return ResponseEntity.ok(new UserResponse(currentUser.getId(), currentUser.getName(),currentUser.getEmail()));
   }
 
   /**
