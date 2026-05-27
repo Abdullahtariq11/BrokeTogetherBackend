@@ -7,6 +7,8 @@ import com.broketogether.api.dto.ItemResponse;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.ShoppingItem;
 import com.broketogether.api.model.User;
+import com.broketogether.api.exception.ConflictException;
+import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.repository.HomeRepository;
 import com.broketogether.api.repository.ShoppingItemRepository;
 import com.broketogether.api.utility.Utility;
@@ -38,7 +40,7 @@ public class ShoppingItemService extends Utility {
     @Transactional
     public ItemResponse createItem(ItemRequest itemRequest) throws AccountNotFoundException {
         Home home = homeRepository.findById(itemRequest.homeId())
-                .orElseThrow(() -> new RuntimeException("Home does not exist with this Id"));
+                .orElseThrow(() -> new ResourceNotFoundException("Home does not exist with this Id"));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(home, userDetails);
 
@@ -64,7 +66,7 @@ public class ShoppingItemService extends Utility {
     public ItemResponse getItemById(Long itemId) throws AccountNotFoundException {
         ShoppingItem shoppingItem = shoppingItemRepository
                 .findById(itemId)
-                .orElseThrow(() -> new RuntimeException("No shopping Item found with this id."));
+                .orElseThrow(() -> new ResourceNotFoundException("No shopping Item found with this id."));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(shoppingItem.getHome(), userDetails);
         return new ItemResponse(shoppingItem.getId(), shoppingItem.getName(), shoppingItem.getPrice(),
@@ -82,7 +84,7 @@ public class ShoppingItemService extends Utility {
     @Transactional(readOnly = true)
     public List<ItemResponse> getAllItemsByHomeId(Long homeId) throws AccountNotFoundException {
         Home home = homeRepository.findById(homeId)
-                .orElseThrow(() -> new RuntimeException("Home not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Home not found."));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(home, userDetails);
         List<ShoppingItem> shoppingItems = shoppingItemRepository.findByHomeId(homeId);
@@ -106,7 +108,7 @@ public class ShoppingItemService extends Utility {
     public void deleteById(Long itemId) throws AccountNotFoundException {
         ShoppingItem shoppingItem = shoppingItemRepository
                 .findById(itemId)
-                .orElseThrow(() -> new RuntimeException("No shopping Item found with this id."));
+                .orElseThrow(() -> new ResourceNotFoundException("No shopping Item found with this id."));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(shoppingItem.getHome(), userDetails);
         shoppingItemRepository.deleteById(itemId);
@@ -123,7 +125,7 @@ public class ShoppingItemService extends Utility {
     public ItemResponse editItem(Long itemId, ItemRequest itemRequest) throws AccountNotFoundException {
         ShoppingItem shoppingItem = shoppingItemRepository
                 .findById(itemId)
-                .orElseThrow(() -> new RuntimeException("No shopping Item found with this id."));
+                .orElseThrow(() -> new ResourceNotFoundException("No shopping Item found with this id."));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(shoppingItem.getHome(), userDetails);
         shoppingItem.setName(itemRequest.name());
@@ -146,7 +148,7 @@ public class ShoppingItemService extends Utility {
     public ItemResponse markItem(Long itemId) throws AccountNotFoundException {
         ShoppingItem shoppingItem = shoppingItemRepository
                 .findById(itemId)
-                .orElseThrow(() -> new RuntimeException("No shopping Item found with this id."));
+                .orElseThrow(() -> new ResourceNotFoundException("No shopping Item found with this id."));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(shoppingItem.getHome(), userDetails);
         if (shoppingItem.getCheckedBy() == null) {
@@ -175,18 +177,18 @@ public class ShoppingItemService extends Utility {
     public ExpenseResponse convertToExpense(Long itemId, boolean split) throws AccountNotFoundException {
         ShoppingItem shoppingItem = shoppingItemRepository
                 .findById(itemId)
-                .orElseThrow(() -> new RuntimeException("No shopping Item found with this id."));
+                .orElseThrow(() -> new ResourceNotFoundException("No shopping Item found with this id."));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(shoppingItem.getHome(), userDetails);
 
         if(shoppingItem.getConvertedToExpense()){
-            throw new RuntimeException("Item already converted to expense.");
+            throw new ConflictException("Item already converted to expense.");
         }
         if (!shoppingItem.getChecked()) {
-            throw new RuntimeException("Item must be checked before converting to an expense.");
+            throw new IllegalArgumentException("Item must be checked before converting to an expense.");
         }
         if (shoppingItem.getPrice() == null) {
-            throw new RuntimeException("Item must have a price to be converted to an expense.");
+            throw new IllegalArgumentException("Item must have a price to be converted to an expense.");
         }
 
         shoppingItem.setConvertedToExpense(true);
