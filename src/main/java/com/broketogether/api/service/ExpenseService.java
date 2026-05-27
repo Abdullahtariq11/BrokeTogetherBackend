@@ -167,36 +167,35 @@ public class ExpenseService extends Utility {
   }
 
   @Transactional(readOnly = true)
-  public List<ExpenseResponse> getAllExpensesForHome(Long homeId) throws AccountNotFoundException {
+  public PagedExpenseResponse getAllExpensesForHome(Long homeId, int page, int size)
+      throws AccountNotFoundException {
     User userDetails = getUserDetails();
     Home home = homeRepository.findById(homeId)
         .orElseThrow(() -> new ResourceNotFoundException("Home not found."));
 
-    // Check if any member in the home has an ID matching the current user's ID
-    checkUserMemberOfHome(home,userDetails);
+    checkUserMemberOfHome(home, userDetails);
 
-    List<Expense> expenses = expenseRepository.findByHomeId(homeId);
+    org.springframework.data.domain.Page<Expense> expensePage =
+        expenseRepository.findByHomeIdOrderByIdDesc(
+            homeId, org.springframework.data.domain.PageRequest.of(page, size));
+
     List<ExpenseResponse> expenseResponses = new ArrayList<>();
-
-    for (Expense expense : expenses) {
+    for (Expense expense : expensePage.getContent()) {
       Map<Long, ExpenseSplitResponse> splitResponses = new HashMap<>();
-
       for (ExpenseSplit split : expense.getSplits()) {
         splitResponses.put(split.getUser().getId(),
             new ExpenseSplitResponse(split.getId(), split.getAmount()));
       }
-
       ExpenseResponse response = new ExpenseResponse(expense.getId(), expense.getAmount(),
           expense.getDescription(), expense.getCategory(), splitResponses);
       if (expense.getPayer() != null) {
         response.setPayerId(expense.getPayer().getId());
         response.setPayerName(expense.getPayer().getName());
       }
-
       expenseResponses.add(response);
     }
 
-    return expenseResponses;
+    return new PagedExpenseResponse(expenseResponses, !expensePage.isLast(), page);
   }
 
   /**

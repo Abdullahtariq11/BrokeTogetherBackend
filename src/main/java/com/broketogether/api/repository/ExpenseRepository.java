@@ -2,6 +2,8 @@ package com.broketogether.api.repository;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,5 +13,7 @@ import com.broketogether.api.model.Expense;
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
   List<Expense> findByHomeId(Long homeId);
+
+  Page<Expense> findByHomeIdOrderByIdDesc(Long homeId, Pageable pageable);
 
 }
