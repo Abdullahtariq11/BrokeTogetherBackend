@@ -61,10 +61,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
   }
 
   private String getClientIp(HttpServletRequest request) {
-    String xForwardedFor = request.getHeader("X-Forwarded-For");
-    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-      return xForwardedFor.split(",")[0].trim();
-    }
+    // With server.forward-headers-strategy=native, Spring has already resolved
+    // the real client IP from X-Forwarded-For into getRemoteAddr().
+    // Reading the raw header directly would allow spoofing to bypass rate limiting.
     return request.getRemoteAddr();
   }
 }
