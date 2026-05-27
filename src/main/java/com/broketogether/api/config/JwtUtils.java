@@ -104,15 +104,22 @@ public class JwtUtils {
    * @return A compact, URL-safe JWT token string
    */
   public String generateToken(Authentication authentication) {
-    // Extract the UserDetails from the authenticated user
     UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
-    return Jwts.builder().setSubject(userPrincipal.getUsername()) // Store user's email as the
-        // subject
-        .setIssuedAt(new Date()) // Set token creation timestamp
-        .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs)) // Set expiration time
-        .signWith(getSigningKey()) // Sign the token with our secret key (uses HS512 by default)
-        .compact(); // Build and serialize to a compact string format
+    return Jwts.builder().setSubject(userPrincipal.getUsername())
+        .setIssuedAt(new Date())
+        .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+        .signWith(getSigningKey())
+        .compact();
+  }
+
+  public String generateToken(UserDetails userDetails) {
+    return Jwts.builder()
+            .setSubject(userDetails.getUsername())
+            .setIssuedAt(new Date())
+            .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+            .signWith(getSigningKey())
+            .compact();
   }
 
   /**
