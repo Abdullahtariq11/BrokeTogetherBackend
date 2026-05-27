@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.broketogether.api.dto.ExpenseRequest;
 import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ExpenseSplitResponse;
+import com.broketogether.api.dto.PagedExpenseResponse;
 import com.broketogether.api.exception.ForbiddenException;
 import com.broketogether.api.exception.GlobalExceptionHandler;
 import com.broketogether.api.exception.ResourceNotFoundException;
@@ -199,21 +200,24 @@ public class ExpenseControllerTest {
       List<ExpenseResponse> responses = List.of(
           createMockResponse(1L, new BigDecimal("100.00"), "GROCERIES"),
           createMockResponse(2L, new BigDecimal("50.00"), "UTILITIES"));
-      when(expenseService.getAllExpensesForHome(1L)).thenReturn(responses);
+      when(expenseService.getAllExpensesForHome(1L, 0, 20))
+          .thenReturn(new PagedExpenseResponse(responses, false, 0));
 
       mockMvc.perform(get("/api/v1/expenses/home/1/history"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.length()").value(2));
+          .andExpect(jsonPath("$.expenses.length()").value(2))
+          .andExpect(jsonPath("$.hasMore").value(false));
     }
 
     @Test
     @DisplayName("Should return empty list when no expenses")
     void shouldReturnEmptyListWhenNoExpenses() throws Exception {
-      when(expenseService.getAllExpensesForHome(1L)).thenReturn(Collections.emptyList());
+      when(expenseService.getAllExpensesForHome(1L, 0, 20))
+          .thenReturn(new PagedExpenseResponse(Collections.emptyList(), false, 0));
 
       mockMvc.perform(get("/api/v1/expenses/home/1/history"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.length()").value(0));
+          .andExpect(jsonPath("$.expenses.length()").value(0));
     }
   }
 
