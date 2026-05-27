@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 import javax.security.auth.login.AccountNotFoundException;
 
 import com.broketogether.api.dto.*;
+import com.broketogether.api.exception.ForbiddenException;
+import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.utility.Utility;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -53,7 +55,7 @@ public class ExpenseService extends Utility {
       throws AccountNotFoundException {
     User userDetails = getUserDetails();
     Home home = homeRepository.findById(expenseRequest.getHomeId())
-        .orElseThrow(() -> new RuntimeException("Home with this id does not exist."));
+        .orElseThrow(() -> new ResourceNotFoundException("Home with this id does not exist."));
 
     // Check if any member in the home has an ID matching the current user's ID
     checkUserMemberOfHome(home,userDetails);
@@ -69,7 +71,7 @@ public class ExpenseService extends Utility {
     Set<User> members = home.getMembers();
     // Fix 3: Prevent division by zero if home is somehow empty
     if (members.isEmpty()) {
-      throw new RuntimeException("No members in home");
+      throw new IllegalArgumentException("No members in home");
     }
 
     BigDecimal splitAmount = expense.getAmount().divide(BigDecimal.valueOf(members.size()), 2,
@@ -107,13 +109,13 @@ public class ExpenseService extends Utility {
 
     User userDetails = getUserDetails();
     Home home = homeRepository.findById(expenseRequest.getHomeId())
-        .orElseThrow(() -> new RuntimeException("Home with this id does not exist."));
+        .orElseThrow(() -> new ResourceNotFoundException("Home with this id does not exist."));
 
     // Check if any member in the home has an ID matching the current user's ID
     checkUserMemberOfHome(home,userDetails);
 
     if (home.getMembers().size() <= 1) {
-      throw new RuntimeException("Not enough members in the home to split.");
+      throw new IllegalArgumentException("Not enough members in the home to split.");
 
     }
     List<User> selectedMembers = userRepository.findAllById(expenseRequest.getUserId());
@@ -128,12 +130,12 @@ public class ExpenseService extends Utility {
 
     for (User member : expenseMembers) {
       if (!homeMemberIds.contains(member.getId())) {
-        throw new RuntimeException("User " + member.getId() + " is not a member of this home");
+        throw new ForbiddenException("User " + member.getId() + " is not a member of this home");
       }
     }
 
     if (expenseMembers.size() < 2) {
-      throw new RuntimeException("A split requires at least two participants.");
+      throw new IllegalArgumentException("A split requires at least two participants.");
     }
 
     Expense expense = new Expense();
@@ -168,7 +170,7 @@ public class ExpenseService extends Utility {
   public List<ExpenseResponse> getAllExpensesForHome(Long homeId) throws AccountNotFoundException {
     User userDetails = getUserDetails();
     Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found."));
 
     // Check if any member in the home has an ID matching the current user's ID
     checkUserMemberOfHome(home,userDetails);
@@ -206,7 +208,7 @@ public class ExpenseService extends Utility {
   @Transactional(readOnly = true)
   public ExpenseResponse getExpenseById(Long expenseId) throws AccountNotFoundException {
     Expense expense = expenseRepository.findById(expenseId)
-        .orElseThrow(() -> new RuntimeException("No expense exists for this id"));
+        .orElseThrow(() -> new ResourceNotFoundException("No expense exists for this id"));
 
     User userDetails = getUserDetails();
 
@@ -231,7 +233,7 @@ public class ExpenseService extends Utility {
   public Map<Long, BigDecimal> getHomeBalances(Long homeId) throws AccountNotFoundException {
     User userDetails = getUserDetails();
     Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found."));
 
     // Check if any member in the home has an ID matching the current user's ID
     checkUserMemberOfHome(home,userDetails);
@@ -276,11 +278,11 @@ public class ExpenseService extends Utility {
   public void deleteExpense(Long expenseId) throws AccountNotFoundException {
     User userDetails = getUserDetails();
     Expense expense = expenseRepository.findById(expenseId)
-        .orElseThrow(() -> new RuntimeException("Expense not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
 
     // Security: Only the person who paid for it can delete it
     if (!expense.getPayer().getId().equals(userDetails.getId())) {
-      throw new RuntimeException("Only the payer can delete this expense");
+      throw new ForbiddenException("Only the payer can delete this expense");
     }
 
     expenseRepository.delete(expense);
@@ -299,7 +301,7 @@ public class ExpenseService extends Utility {
       throws AccountNotFoundException {
     User payer = getUserDetails();
     Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found."));
     checkUserMemberOfHome(home, payer);
 
     Expense expense = new Expense();
@@ -324,16 +326,16 @@ public class ExpenseService extends Utility {
   public ExpenseResponse settleUp(Long homeId, Long payeeId, BigDecimal amount) throws AccountNotFoundException {
     User payer = getUserDetails(); // The person paying the money
     User payee = userRepository.findById(payeeId)
-        .orElseThrow(() -> new RuntimeException("Payee not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Payee not found"));
     Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
 
     // Validation: Both must be in the same home
     boolean isPayerInHome = home.getMembers().stream().anyMatch(m -> m.getId().equals(payer.getId()));
     boolean isPayeeInHome = home.getMembers().stream().anyMatch(m -> m.getId().equals(payee.getId()));
 
     if (!isPayerInHome || !isPayeeInHome) {
-      throw new RuntimeException("Both users must be members of the same home to settle up");
+      throw new ForbiddenException("Both users must be members of the same home to settle up");
     }
 
     Expense settlement = new Expense();
@@ -366,7 +368,7 @@ public class ExpenseService extends Utility {
 
     // Build a name lookup map from home members
     Home home = homeRepository.findById(homeId)
-            .orElseThrow(() -> new RuntimeException("Home not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("Home not found."));
     Map<Long, String> nameMap = home.getMembers().stream()
             .collect(Collectors.toMap(User::getId, User::getName));
 

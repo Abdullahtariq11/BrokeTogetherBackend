@@ -7,6 +7,7 @@ import java.util.Set;
 import javax.security.auth.login.AccountNotFoundException;
 
 import com.broketogether.api.dto.UserResponse;
+import com.broketogether.api.exception.ConflictException;
 import com.broketogether.api.utility.Utility;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -69,7 +70,7 @@ public class UserService extends Utility {
    */
   public UserResponse saveUser(User user) {
     if (this.userRepository.existsByEmail(user.getEmail())) {
-      throw new RuntimeException("Email already in use!");
+      throw new ConflictException("Email already in use!");
     }
     String rawPassword = user.getPassword();
     String encodedPassword = passwordEncoder.encode(rawPassword);

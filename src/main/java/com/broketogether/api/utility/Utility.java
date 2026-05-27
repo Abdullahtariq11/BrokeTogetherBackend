@@ -1,5 +1,6 @@
 package com.broketogether.api.utility;
 
+import com.broketogether.api.exception.ForbiddenException;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.User;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,7 +28,7 @@ public abstract class Utility {
         boolean isMember= home.getMembers().stream()
                 .anyMatch(member -> member.getId().equals(userDetails.getId()));
         if (!isMember) {
-            throw new RuntimeException("You are not a member of this home");
+            throw new ForbiddenException("You are not a member of this home");
         }
         return true;
     }

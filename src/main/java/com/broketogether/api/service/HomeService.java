@@ -6,9 +6,11 @@ import java.util.stream.Collectors;
 
 import javax.security.auth.login.AccountNotFoundException;
 
+import com.broketogether.api.exception.ConflictException;
+import com.broketogether.api.exception.ForbiddenException;
+import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.utility.Utility;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,8 +20,6 @@ import com.broketogether.api.model.Home;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.HomeRepository;
 import com.broketogether.api.repository.UserRepository;
-
-import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class HomeService extends Utility {
@@ -52,6 +52,7 @@ public class HomeService extends Utility {
     return new HomeResponse(homeCreated.getId(), homeCreated.getName(),
         homeCreated.getInviteCode(),homeCreated.getCreator().getId());
   }
+
   /**
    * Regenerate home invite code.
    *
@@ -60,7 +61,7 @@ public class HomeService extends Utility {
   @Transactional
   public HomeResponse regenerateCode(Long homeId) throws AccountNotFoundException {
     Home home = homeRepository.findById(homeId)
-            .orElseThrow(() -> new EntityNotFoundException("Home with this Id not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Home with this Id not found"));
     User userDetails = getUserDetails();
     if (!home.getCreator().getId().equals(userDetails.getId())) {
       throw new AccessDeniedException("User is not an admin of this home.");
@@ -81,10 +82,10 @@ public class HomeService extends Utility {
   @Transactional
   public HomeResponse joinHome(String inviteCode) throws AccountNotFoundException {
     Home home = homeRepository.findByInviteCode(inviteCode)
-        .orElseThrow(() -> new RuntimeException("Invalid invite code."));
+        .orElseThrow(() -> new ResourceNotFoundException("Invalid invite code."));
     User userDetails = getUserDetails();
     if (home.getMembers().contains(userDetails)) {
-      throw new RuntimeException("User is already a member of this home.");
+      throw new ConflictException("User is already a member of this home.");
     }
     home.getMembers().add(userDetails);
     Home homeCreated = homeRepository.save(home);
@@ -100,14 +101,14 @@ public class HomeService extends Utility {
   @Transactional
   public void removeMembers(Long homeId, Long memberId) throws AccountNotFoundException {
     Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new EntityNotFoundException("Home with this Id not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Home with this Id not found"));
     User user = userRepository.findById(memberId)
         .orElseThrow(() -> new AccountNotFoundException("User with this Id not found"));
     User currentUser = getUserDetails();
 
     if (!home.getCreator().getId().equals(currentUser.getId())
         && !currentUser.getId().equals(user.getId())) {
-      throw new RuntimeException("You do not have permission to remove this member.");
+      throw new ForbiddenException("You do not have permission to remove this member.");
     }
 
     home.getMembers().removeIf(u -> u.getId().equals(memberId));
@@ -134,7 +135,7 @@ public class HomeService extends Utility {
   @Transactional(readOnly = true)
   public Set<MemberResponse> getHomeMembers(Long homeId) throws AccountNotFoundException {
     Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
     verifyMembership(home);
     return home.getMembers().stream()
         .map(h -> new MemberResponse(h.getId(), h.getName()))
@@ -161,7 +162,7 @@ public class HomeService extends Utility {
   @Transactional(readOnly = true)
   public HomeResponse getHomeById(Long homeId) throws AccountNotFoundException {
     Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
     verifyMembership(home);
     return new HomeResponse(home.getId(), home.getName(), home.getInviteCode(),home.getCreator().getId());
   }
@@ -172,11 +173,11 @@ public class HomeService extends Utility {
   @Transactional
   public HomeResponse renameHome(Long homeId, String newName) throws AccountNotFoundException {
     Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
     User currentUser = getUserDetails();
 
     if (!home.getCreator().getId().equals(currentUser.getId())) {
-      throw new RuntimeException("You do not have permission to rename this home.");
+      throw new ForbiddenException("You do not have permission to rename this home.");
     }
 
     home.setName(newName);
@@ -190,7 +191,7 @@ public class HomeService extends Utility {
   @Transactional
   public void leaveHome(Long homeId) throws AccountNotFoundException {
     Home home = homeRepository.findById(homeId)
-        .orElseThrow(() -> new RuntimeException("Home not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
     User currentUser = getUserDetails();
 
     verifyMembership(home);
@@ -206,17 +207,16 @@ public class HomeService extends Utility {
 
   private void changeOwnerShip(Home home,User currentUser){
     if(home==null){
-      throw new RuntimeException("Home does not exist.");
+      throw new ResourceNotFoundException("Home does not exist.");
     }
     if(currentUser==null){
-      throw new RuntimeException("User does not exist.");
-
+      throw new ResourceNotFoundException("User does not exist.");
     }
     User member = home
             .getMembers()
             .stream()
             .filter(u -> !u.getId().equals(currentUser.getId()))
-            .findFirst().orElseThrow(() -> new RuntimeException("No other member exists. Please delete the home instead."));
+            .findFirst().orElseThrow(() -> new IllegalArgumentException("No other member exists. Please delete the home instead."));
 
     home.setCreator(member);
   }
@@ -230,7 +230,7 @@ public class HomeService extends Utility {
     boolean isMember = home.getMembers().stream()
         .anyMatch(m -> m.getId().equals(currentUser.getId()));
     if (!isMember) {
-      throw new RuntimeException("You are not a member of this home");
+      throw new ForbiddenException("You are not a member of this home");
     }
   }
 

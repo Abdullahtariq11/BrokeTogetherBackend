@@ -24,12 +24,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.broketogether.api.dto.HomeResponse;
 import com.broketogether.api.dto.MemberResponse;
+import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.HomeRepository;
 import com.broketogether.api.repository.UserRepository;
-
-import jakarta.persistence.EntityNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 public class HomeServiceTest {
@@ -194,7 +193,7 @@ public class HomeServiceTest {
     @DisplayName("Should throw exception when home not found")
     void shouldThrowExceptionWhenHomeNotFound() {
       when(homeRepository.findById(999L)).thenReturn(Optional.empty());
-      assertThrows(EntityNotFoundException.class,
+      assertThrows(ResourceNotFoundException.class,
           () -> homeService.removeMembers(999L, 2L));
     }
 

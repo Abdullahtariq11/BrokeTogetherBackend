@@ -11,7 +11,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -32,7 +31,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     // 300 requests per minute per IP (5 req/sec burst tolerance)
     // React StrictMode double-invokes effects in dev, and a dashboard load
     // fires several parallel requests — 30/min was far too restrictive.
-    Bandwidth limit = Bandwidth.classic(300, Refill.greedy(300, Duration.ofMinutes(1)));
+    Bandwidth limit = Bandwidth.builder()
+        .capacity(300)
+        .refillGreedy(300, Duration.ofMinutes(1))
+        .build();
     return Bucket.builder().addLimit(limit).build();
   }
 
