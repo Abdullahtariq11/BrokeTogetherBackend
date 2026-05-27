@@ -31,6 +31,7 @@ public class SecurityConfig {
   private final UserDetailsService userDetailsService;
   private final JwtAuthenticationFilter jwtAuthFilter;
   private final RateLimitFilter rateLimitFilter;
+  private final OAuth2SuccessHandler oauth2SuccessHandler;
 
   /**
    * Constructor injection of required dependencies.
@@ -41,12 +42,14 @@ public class SecurityConfig {
    * @param rateLimitFilter    Filter that limits requests per IP
    */
   public SecurityConfig(PasswordEncoder passwordEncoder, UserDetailsService userDetailsService,
-      JwtAuthenticationFilter jwtAuthFilter, RateLimitFilter rateLimitFilter) {
+      JwtAuthenticationFilter jwtAuthFilter, RateLimitFilter rateLimitFilter,
+      OAuth2SuccessHandler oauth2SuccessHandler) {
 
     this.passwordEncoder = passwordEncoder;
     this.userDetailsService = userDetailsService;
     this.jwtAuthFilter = jwtAuthFilter;
     this.rateLimitFilter = rateLimitFilter;
+    this.oauth2SuccessHandler = oauth2SuccessHandler;
   }
 
   /**
@@ -172,12 +175,15 @@ public class SecurityConfig {
         .permitAll()
         .requestMatchers("/privacy-policy.html", "/terms-and-conditions.html", "/delete-account.html").permitAll()
         .requestMatchers("/actuator/**").permitAll()
+        .requestMatchers("/login/oauth2/**", "/oauth2/**").permitAll()
 
         // Explicitly protect the Homes API (ensures matchers catch sub-paths)
         .requestMatchers("/api/v1/homes/**").authenticated()
 
         // All other requests
         .anyRequest().authenticated())
+    .oauth2Login(oauth2 -> oauth2
+        .successHandler(oauth2SuccessHandler))
     .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
     .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
