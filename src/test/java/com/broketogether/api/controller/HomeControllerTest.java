@@ -24,7 +24,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.broketogether.api.dto.HomeResponse;
 import com.broketogether.api.dto.MemberResponse;
+import com.broketogether.api.exception.ForbiddenException;
 import com.broketogether.api.exception.GlobalExceptionHandler;
+import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.service.HomeService;
 
 @ExtendWith(MockitoExtension.class)
@@ -117,12 +119,12 @@ public class HomeControllerTest {
     @DisplayName("Should return error when invite code is invalid")
     void shouldReturnErrorWhenInviteCodeInvalid() throws Exception {
       when(homeService.joinHome("INVALID"))
-          .thenThrow(new RuntimeException("Invalid invite code."));
+          .thenThrow(new ResourceNotFoundException("Invalid invite code."));
 
       mockMvc.perform(post("/api/v1/homes/join")
               .contentType(MediaType.APPLICATION_JSON)
               .content("{\"inviteCode\":\"INVALID\"}"))
-          .andExpect(status().isBadRequest());
+          .andExpect(status().isNotFound());
     }
   }
 
@@ -178,7 +180,7 @@ public class HomeControllerTest {
     @DisplayName("Should return error when home not found")
     void shouldReturnErrorWhenHomeNotFound() throws Exception {
       when(homeService.getHomeById(999L))
-          .thenThrow(new RuntimeException("Home not found"));
+          .thenThrow(new ResourceNotFoundException("Home not found"));
 
       mockMvc.perform(get("/api/v1/homes/999"))
           .andExpect(status().isNotFound());
@@ -188,7 +190,7 @@ public class HomeControllerTest {
     @DisplayName("Should return 403 when user is not a member")
     void shouldReturn403WhenNotMember() throws Exception {
       when(homeService.getHomeById(1L))
-          .thenThrow(new RuntimeException("You are not a member of this home"));
+          .thenThrow(new ForbiddenException("You are not a member of this home"));
 
       mockMvc.perform(get("/api/v1/homes/1"))
           .andExpect(status().isForbidden());
@@ -218,7 +220,7 @@ public class HomeControllerTest {
     @DisplayName("Should return 403 when user is not a member")
     void shouldReturn403WhenNotMember() throws Exception {
       when(homeService.getHomeMembers(1L))
-          .thenThrow(new RuntimeException("You are not a member of this home"));
+          .thenThrow(new ForbiddenException("You are not a member of this home"));
 
       mockMvc.perform(get("/api/v1/homes/1/members"))
           .andExpect(status().isForbidden());
@@ -243,7 +245,7 @@ public class HomeControllerTest {
     @Test
     @DisplayName("Should return 403 when not creator")
     void shouldReturn403WhenNotCreator() throws Exception {
-      doThrow(new RuntimeException("You do not have permission to remove this member."))
+      doThrow(new ForbiddenException("You do not have permission to remove this member."))
           .when(homeService).removeMembers(1L, 2L);
 
       mockMvc.perform(delete("/api/v1/homes/1/members/2"))
@@ -283,7 +285,7 @@ public class HomeControllerTest {
     @DisplayName("Should return 403 when not creator")
     void shouldReturn403WhenNotCreator() throws Exception {
       when(homeService.renameHome(anyLong(), anyString()))
-          .thenThrow(new RuntimeException("You do not have permission to rename this home."));
+          .thenThrow(new ForbiddenException("You do not have permission to rename this home."));
 
       mockMvc.perform(put("/api/v1/homes/1")
               .contentType(MediaType.APPLICATION_JSON)
@@ -310,11 +312,11 @@ public class HomeControllerTest {
     @Test
     @DisplayName("Should return error when creator tries to leave")
     void shouldReturnErrorWhenCreatorTriesToLeave() throws Exception {
-      doThrow(new RuntimeException("The home creator cannot leave. Transfer ownership or delete the home."))
+      doThrow(new IllegalArgumentException("No other member exists. Please delete the home instead."))
           .when(homeService).leaveHome(1L);
 
       mockMvc.perform(delete("/api/v1/homes/1/leave"))
-          .andExpect(status().isInternalServerError());
+          .andExpect(status().isBadRequest());
     }
   }
 

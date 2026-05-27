@@ -27,7 +27,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.broketogether.api.dto.ExpenseRequest;
 import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ExpenseSplitResponse;
+import com.broketogether.api.exception.ForbiddenException;
 import com.broketogether.api.exception.GlobalExceptionHandler;
+import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.service.ExpenseService;
 
 @ExtendWith(MockitoExtension.class)
@@ -115,7 +117,7 @@ public class ExpenseControllerTest {
     @DisplayName("Should return error when home not found")
     void shouldReturnErrorWhenHomeNotFound() throws Exception {
       when(expenseService.createExpense(any(ExpenseRequest.class)))
-          .thenThrow(new RuntimeException("Home with this id doesnot exist."));
+          .thenThrow(new ResourceNotFoundException("Home with this id does not exist."));
 
       mockMvc.perform(post("/api/v1/expenses")
               .contentType(MediaType.APPLICATION_JSON)
@@ -178,7 +180,7 @@ public class ExpenseControllerTest {
     @DisplayName("Should return 403 when user is not a member")
     void shouldReturn403WhenNotMember() throws Exception {
       when(expenseService.getHomeBalances(1L))
-          .thenThrow(new RuntimeException("You are not a member of this home"));
+          .thenThrow(new ForbiddenException("You are not a member of this home"));
 
       mockMvc.perform(get("/api/v1/expenses/home/1/balances"))
           .andExpect(status().isForbidden());
@@ -236,7 +238,7 @@ public class ExpenseControllerTest {
     @DisplayName("Should return error when expense not found")
     void shouldReturnErrorWhenExpenseNotFound() throws Exception {
       when(expenseService.getExpenseById(999L))
-          .thenThrow(new RuntimeException("Expense not found"));
+          .thenThrow(new ResourceNotFoundException("No expense exists for this id"));
 
       mockMvc.perform(get("/api/v1/expenses/expense/999"))
           .andExpect(status().isNotFound());
@@ -261,11 +263,11 @@ public class ExpenseControllerTest {
     @Test
     @DisplayName("Should return error when not payer")
     void shouldReturnErrorWhenNotPayer() throws Exception {
-      doThrow(new RuntimeException("Only the payer can delete this expense"))
+      doThrow(new ForbiddenException("Only the payer can delete this expense"))
           .when(expenseService).deleteExpense(1L);
 
       mockMvc.perform(delete("/api/v1/expenses/1"))
-          .andExpect(status().isInternalServerError());
+          .andExpect(status().isForbidden());
     }
   }
 
@@ -322,7 +324,7 @@ public class ExpenseControllerTest {
     @DisplayName("Should return error when users not in same home")
     void shouldReturnErrorWhenUsersNotInSameHome() throws Exception {
       when(expenseService.settleUp(eq(1L), eq(99L), any(BigDecimal.class)))
-          .thenThrow(new RuntimeException("Both users must be members of the same home to settle up"));
+          .thenThrow(new ForbiddenException("Both users must be members of the same home to settle up"));
 
       mockMvc.perform(post("/api/v1/expenses/settle")
               .contentType(MediaType.APPLICATION_JSON)
