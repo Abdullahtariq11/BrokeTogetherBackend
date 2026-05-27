@@ -14,10 +14,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.broketogether.api.config.JwtUtils;
+import com.broketogether.api.dto.ForgotPasswordRequest;
 import com.broketogether.api.dto.JwtResponse;
 import com.broketogether.api.dto.LoginRequest;
 import com.broketogether.api.dto.RegisterRequest;
+import com.broketogether.api.dto.TokenResetPasswordRequest;
 import com.broketogether.api.model.User;
+import com.broketogether.api.service.PasswordResetService;
 import com.broketogether.api.service.UserService;
 
 @RestController
@@ -27,12 +30,14 @@ public class AuthController {
   private final UserService userService;
   private final AuthenticationManager authenticationManager;
   private final JwtUtils jwtUtils;
+  private final PasswordResetService passwordResetService;
 
   public AuthController(UserService userService, AuthenticationManager authenticationManager,
-      JwtUtils jwtUtils) {
+      JwtUtils jwtUtils, PasswordResetService passwordResetService) {
     this.userService = userService;
     this.authenticationManager = authenticationManager;
     this.jwtUtils = jwtUtils;
+    this.passwordResetService = passwordResetService;
   }
 
   /**
@@ -92,6 +97,27 @@ public class AuthController {
     userService.saveUser(user);
 
     return ResponseEntity.status(201).body("Account created successfully.");
+  }
+
+  /**
+   * Sends a password reset email if the address is registered.
+   * Always returns 200 to prevent email enumeration.
+   */
+  @PostMapping("/forgot-password")
+  public ResponseEntity<String> forgotPassword(
+      @Valid @RequestBody ForgotPasswordRequest request) {
+    passwordResetService.initiateReset(request.getEmail());
+    return ResponseEntity.ok("If that email is registered, a reset link has been sent.");
+  }
+
+  /**
+   * Resets the user's password using a valid reset token.
+   */
+  @PostMapping("/reset-password")
+  public ResponseEntity<String> resetPassword(
+      @Valid @RequestBody TokenResetPasswordRequest request) {
+    passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
+    return ResponseEntity.ok("Password reset successfully.");
   }
 
 }
