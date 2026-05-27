@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.broketogether.api.service.ExpenseService;
@@ -49,9 +50,12 @@ public class ExpenseController {
   }
 
   @GetMapping("/home/{homeId}/history")
-  public ResponseEntity<List<ExpenseResponse>> getAllByHomeId(@PathVariable Long homeId)
+  public ResponseEntity<PagedExpenseResponse> getAllByHomeId(
+      @PathVariable Long homeId,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size)
       throws AccountNotFoundException {
-    return ResponseEntity.ok(expenseService.getAllExpensesForHome(homeId));
+    return ResponseEntity.ok(expenseService.getAllExpensesForHome(homeId, page, size));
   }
 
   @GetMapping("/expense/{expenseId}")
