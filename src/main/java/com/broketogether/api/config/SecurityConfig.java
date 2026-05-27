@@ -100,7 +100,13 @@ public class SecurityConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
       CorsConfiguration configuration = new CorsConfiguration();
-      configuration.setAllowedOrigins(Arrays.asList("*"));
+      String allowedOriginsEnv = System.getenv("ALLOWED_ORIGINS");
+      if (allowedOriginsEnv != null && !allowedOriginsEnv.isBlank()) {
+          configuration.setAllowedOrigins(Arrays.asList(allowedOriginsEnv.split(",")));
+      } else {
+          // Fallback for local dev only
+          configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000"));
+      }
       configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
       configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
@@ -174,7 +180,8 @@ public class SecurityConfig {
             "/swagger-ui.html")
         .permitAll()
         .requestMatchers("/privacy-policy.html", "/terms-and-conditions.html", "/delete-account.html").permitAll()
-        .requestMatchers("/actuator/**").permitAll()
+        .requestMatchers("/actuator/health").permitAll()
+        .requestMatchers("/actuator/**").denyAll()
         .requestMatchers("/login/oauth2/**", "/oauth2/**").permitAll()
 
         // Explicitly protect the Homes API (ensures matchers catch sub-paths)
