@@ -2,6 +2,7 @@ package com.broketogether.api.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
@@ -239,23 +240,32 @@ public class ExpenseServiceTest {
       Expense expense1 = createMockExpense(1L, new BigDecimal("100.00"), "GROCERIES");
       Expense expense2 = createMockExpense(2L, new BigDecimal("50.00"), "UTILITIES");
 
+      org.springframework.data.domain.Page<Expense> page =
+          new org.springframework.data.domain.PageImpl<>(List.of(expense1, expense2));
+
       when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
-      when(expenseRepository.findByHomeId(1L)).thenReturn(List.of(expense1, expense2));
+      when(expenseRepository.findByHomeIdOrderByIdDesc(eq(1L), any())).thenReturn(page);
 
-      List<ExpenseResponse> responses = expenseService.getAllExpensesForHome(1L);
+      com.broketogether.api.dto.PagedExpenseResponse result =
+          expenseService.getAllExpensesForHome(1L, 0, 20);
 
-      assertEquals(2, responses.size());
+      assertEquals(2, result.getExpenses().size());
+      assertFalse(result.isHasMore());
     }
 
     @Test
     @DisplayName("Should return empty list when no expenses exist")
     void shouldReturnEmptyListWhenNoExpenses() throws AccountNotFoundException {
+      org.springframework.data.domain.Page<Expense> emptyPage =
+          new org.springframework.data.domain.PageImpl<>(Collections.emptyList());
+
       when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
-      when(expenseRepository.findByHomeId(1L)).thenReturn(Collections.emptyList());
+      when(expenseRepository.findByHomeIdOrderByIdDesc(eq(1L), any())).thenReturn(emptyPage);
 
-      List<ExpenseResponse> responses = expenseService.getAllExpensesForHome(1L);
+      com.broketogether.api.dto.PagedExpenseResponse result =
+          expenseService.getAllExpensesForHome(1L, 0, 20);
 
-      assertTrue(responses.isEmpty());
+      assertTrue(result.getExpenses().isEmpty());
     }
 
     @Test
@@ -268,7 +278,7 @@ public class ExpenseServiceTest {
       when(homeRepository.findById(1L)).thenReturn(Optional.of(homeWithoutUser));
 
       assertThrows(RuntimeException.class,
-          () -> expenseService.getAllExpensesForHome(1L));
+          () -> expenseService.getAllExpensesForHome(1L, 0, 20));
     }
   }
 
