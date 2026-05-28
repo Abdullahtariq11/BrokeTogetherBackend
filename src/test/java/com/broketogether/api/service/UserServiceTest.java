@@ -27,7 +27,9 @@ import org.mockito.ArgumentCaptor;
 import com.broketogether.api.dto.UserResponse;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.ExpenseRepository;
+import com.broketogether.api.repository.ExpenseSplitRepository;
 import com.broketogether.api.repository.HomeRepository;
+import com.broketogether.api.repository.PasswordResetTokenRepository;
 import com.broketogether.api.repository.ShoppingItemRepository;
 import com.broketogether.api.repository.UserRepository;
 
@@ -49,11 +51,17 @@ public class UserServiceTest {
   @Mock
   private ShoppingItemRepository shoppingItemRepository;
 
+  @Mock
+  private ExpenseSplitRepository expenseSplitRepository;
+
+  @Mock
+  private PasswordResetTokenRepository passwordResetTokenRepository;
+
   private UserService userService;
 
   @BeforeEach
   void setUp() throws Exception {
-    userService = new UserService(userRepository, passwordEncoder, homeRepository, expenseRepository, shoppingItemRepository);
+    userService = new UserService(userRepository, passwordEncoder, homeRepository, expenseRepository, shoppingItemRepository, expenseSplitRepository, passwordResetTokenRepository);
   }
 
   // ==================== Constructor Tests ====================
@@ -66,7 +74,7 @@ public class UserServiceTest {
     @DisplayName("Should throw exception when repository is null")
     void shouldThrowExceptionWhenRepositoryIsNull() {
       Exception exception = assertThrows(Exception.class,
-          () -> new UserService(null, passwordEncoder, homeRepository, expenseRepository, shoppingItemRepository));
+          () -> new UserService(null, passwordEncoder, homeRepository, expenseRepository, shoppingItemRepository, expenseSplitRepository, passwordResetTokenRepository));
 
       assertEquals("Repository cannot be null", exception.getMessage());
     }
@@ -74,7 +82,7 @@ public class UserServiceTest {
     @Test
     @DisplayName("Should create service when repository is provided")
     void shouldCreateServiceWhenRepositoryProvided() {
-      assertDoesNotThrow(() -> new UserService(userRepository, passwordEncoder, homeRepository, expenseRepository, shoppingItemRepository));
+      assertDoesNotThrow(() -> new UserService(userRepository, passwordEncoder, homeRepository, expenseRepository, shoppingItemRepository, expenseSplitRepository, passwordResetTokenRepository));
     }
   }
 
