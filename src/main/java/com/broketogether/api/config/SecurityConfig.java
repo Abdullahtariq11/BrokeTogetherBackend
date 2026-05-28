@@ -1,9 +1,11 @@
 package com.broketogether.api.config;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -102,17 +104,23 @@ public class SecurityConfig {
       CorsConfiguration configuration = new CorsConfiguration();
       String allowedOriginsEnv = System.getenv("ALLOWED_ORIGINS");
       if (allowedOriginsEnv != null && !allowedOriginsEnv.isBlank()) {
-          configuration.setAllowedOrigins(Arrays.asList(allowedOriginsEnv.split(",")));
+          List<String> origins = Arrays.stream(allowedOriginsEnv.split(","))
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .collect(java.util.stream.Collectors.toList());
+          configuration.setAllowedOrigins(origins);
       } else {
           // Fallback for local dev only
           configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000"));
       }
       configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-      configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
+      // Allow all request headers so browser preflight never gets blocked on header validation.
+      // JWT is sent in Authorization header; no cookies / credentials needed.
+      configuration.addAllowedHeader("*");
 
-      // Note: allowCredentials cannot be true when allowedOrigins is "*"
-      // Mobile apps send JWT in header, not cookies, so credentials flag is unnecessary
+      // Pre-flight responses can be cached by the browser for 1 hour
+      configuration.setMaxAge(3600L);
 
       UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
       source.registerCorsConfiguration("/**", configuration);
@@ -175,6 +183,8 @@ public class SecurityConfig {
     .sessionManagement(
         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
     .authorizeHttpRequests(auth -> auth
+        // CORS pre-flight: always allow OPTIONS so the browser gets CORS headers back
+        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
         // Public Endpoints
         .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
             "/swagger-ui.html")
