@@ -6,8 +6,10 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.client.RestTemplate;
 
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,13 +17,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.broketogether.api.config.JwtUtils;
 import com.broketogether.api.dto.ForgotPasswordRequest;
+import com.broketogether.api.dto.GoogleMobileRequest;
 import com.broketogether.api.dto.JwtResponse;
 import com.broketogether.api.dto.LoginRequest;
 import com.broketogether.api.dto.RegisterRequest;
 import com.broketogether.api.dto.TokenResetPasswordRequest;
 import com.broketogether.api.model.User;
+import com.broketogether.api.repository.UserRepository;
 import com.broketogether.api.service.PasswordResetService;
 import com.broketogether.api.service.UserService;
+
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -31,13 +38,18 @@ public class AuthController {
   private final AuthenticationManager authenticationManager;
   private final JwtUtils jwtUtils;
   private final PasswordResetService passwordResetService;
+  private final UserRepository userRepository;
+  private final PasswordEncoder passwordEncoder;
 
   public AuthController(UserService userService, AuthenticationManager authenticationManager,
-      JwtUtils jwtUtils, PasswordResetService passwordResetService) {
+      JwtUtils jwtUtils, PasswordResetService passwordResetService,
+      UserRepository userRepository, PasswordEncoder passwordEncoder) {
     this.userService = userService;
     this.authenticationManager = authenticationManager;
     this.jwtUtils = jwtUtils;
     this.passwordResetService = passwordResetService;
+    this.userRepository = userRepository;
+    this.passwordEncoder = passwordEncoder;
   }
 
   /**
@@ -118,6 +130,58 @@ public class AuthController {
       @Valid @RequestBody TokenResetPasswordRequest request) {
     passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
     return ResponseEntity.ok("Password reset successfully.");
+  }
+
+  /**
+   * Mobile Google Sign-In — verifies a Google access token, finds or creates
+   * the user, and returns a BrokeTogether JWT.
+   *
+   * Called by the React Native app after it completes the Google OAuth2 flow
+   * via expo-auth-session. The mobile client sends the Google access token;
+   * we call Google's userinfo endpoint to obtain the verified email + name.
+   */
+  @PostMapping("/google/mobile")
+  public ResponseEntity<JwtResponse> googleMobileLogin(
+      @Valid @RequestBody GoogleMobileRequest request) {
+
+    // Verify the access token by calling Google's userinfo endpoint
+    RestTemplate rest = new RestTemplate();
+    @SuppressWarnings("unchecked")
+    Map<String, Object> googleUser = rest.getForObject(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        Map.class,
+        Map.of()
+    );
+
+    // Attach the token in the Authorization header manually
+    org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+    headers.setBearerAuth(request.getAccessToken());
+    org.springframework.http.HttpEntity<Void> entity = new org.springframework.http.HttpEntity<>(headers);
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> profile = rest.exchange(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        org.springframework.http.HttpMethod.GET,
+        entity,
+        Map.class
+    ).getBody();
+
+    if (profile == null || profile.get("email") == null) {
+      throw new IllegalArgumentException("Invalid Google access token.");
+    }
+
+    String email = (String) profile.get("email");
+    String name  = (String) profile.getOrDefault("name", email);
+
+    // Find or create the user (mirrors OAuth2SuccessHandler logic)
+    User user = userRepository.findByEmail(email).orElseGet(() -> {
+      User newUser = new User(name, email,
+          passwordEncoder.encode(UUID.randomUUID().toString()));
+      return userRepository.save(newUser);
+    });
+
+    String jwt = jwtUtils.generateToken(user);
+    return ResponseEntity.ok(new JwtResponse(jwt, user.getEmail(), user.getName()));
   }
 
 }
