@@ -7,6 +7,7 @@ import javax.security.auth.login.AccountNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -62,7 +63,13 @@ public class GlobalExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, ex.getMessage());
   }
 
-  // 401 Unauthorized — bad credentials at login
+  // 401 Unauthorized — bad credentials at login (wrong password)
+  @ExceptionHandler(BadCredentialsException.class)
+  public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
+    return build(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+  }
+
+  // 401 Unauthorized — user not found during authentication
   @ExceptionHandler(org.springframework.security.core.userdetails.UsernameNotFoundException.class)
   public ResponseEntity<ErrorResponse> handleUsernameNotFound(
       org.springframework.security.core.userdetails.UsernameNotFoundException ex) {

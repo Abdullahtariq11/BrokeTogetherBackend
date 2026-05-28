@@ -125,7 +125,7 @@ public class AuthControllerTest {
       mockMvc.perform(post("/api/v1/auth/login")
               .contentType(MediaType.APPLICATION_JSON)
               .content("{\"username\":\"test@example.com\",\"password\":\"wrongpassword\"}"))
-          .andExpect(status().isInternalServerError());
+          .andExpect(status().isUnauthorized());
     }
   }
 
