@@ -8,4 +8,6 @@ import com.broketogether.api.model.ExpenseSplit;
 @Repository
 public interface ExpenseSplitRepository extends JpaRepository<ExpenseSplit, Long> {
 
+  void deleteByUserId(Long userId);
+
 }

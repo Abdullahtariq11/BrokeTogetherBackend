@@ -8,6 +8,9 @@ import javax.security.auth.login.AccountNotFoundException;
 
 import com.broketogether.api.dto.UserResponse;
 import com.broketogether.api.exception.ConflictException;
+import com.broketogether.api.model.Expense;
+import com.broketogether.api.repository.ExpenseSplitRepository;
+import com.broketogether.api.repository.PasswordResetTokenRepository;
 import com.broketogether.api.utility.Utility;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,10 +32,14 @@ public class UserService extends Utility {
   private final HomeRepository homeRepository;
   private final ExpenseRepository expenseRepository;
   private final ShoppingItemRepository shoppingItemRepository;
+  private final ExpenseSplitRepository expenseSplitRepository;
+  private final PasswordResetTokenRepository passwordResetTokenRepository;
 
   public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
       HomeRepository homeRepository, ExpenseRepository expenseRepository,
-      ShoppingItemRepository shoppingItemRepository)
+      ShoppingItemRepository shoppingItemRepository,
+      ExpenseSplitRepository expenseSplitRepository,
+      PasswordResetTokenRepository passwordResetTokenRepository)
       throws Exception {
     if (userRepository == null) {
       throw new Exception("Repository cannot be null");
@@ -42,6 +49,8 @@ public class UserService extends Utility {
     this.homeRepository = homeRepository;
     this.expenseRepository = expenseRepository;
     this.shoppingItemRepository = shoppingItemRepository;
+    this.expenseSplitRepository = expenseSplitRepository;
+    this.passwordResetTokenRepository = passwordResetTokenRepository;
   }
 
   /**
@@ -89,6 +98,17 @@ public class UserService extends Utility {
   @Transactional
   public void deleteAccount() throws AccountNotFoundException {
     User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+    // 1. Delete password reset tokens referencing this user
+    passwordResetTokenRepository.deleteByUser(currentUser);
+
+    // 2. Delete expenses in non-owned homes where this user is the payer
+    //    (payer_id is non-nullable, so these must be removed before deleting the user)
+    List<Expense> expensesAsPayer = expenseRepository.findByPayerId(currentUser.getId());
+    expenseRepository.deleteAll(expensesAsPayer); // cascades to their ExpenseSplits
+
+    // 3. Delete any remaining ExpenseSplit rows referencing this user
+    expenseSplitRepository.deleteByUserId(currentUser.getId());
 
     // Non-owned homes — remove user from members.
     // Also clear FK references to this user on any shopping items they added or checked.

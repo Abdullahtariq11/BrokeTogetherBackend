@@ -16,4 +16,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
   Page<Expense> findByHomeIdOrderByIdDesc(Long homeId, Pageable pageable);
 
+  List<Expense> findByPayerId(Long payerId);
+
 }
