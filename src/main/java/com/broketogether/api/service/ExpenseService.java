@@ -257,10 +257,16 @@ public class ExpenseService extends Utility {
 
         if (!memberId.equals(payerId)) {
           // Update Payer: (Owed money)
-          balances.compute(payerId, (k, v) -> v.add(amount));
+          // Use getOrDefault to handle users who were removed from the home
+          // but whose expense records still exist
+          balances.put(payerId,
+              balances.getOrDefault(payerId, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
+                  .add(amount));
 
           // Update Member: (Owes money)
-          balances.compute(memberId, (k, v) -> v.subtract(amount));
+          balances.put(memberId,
+              balances.getOrDefault(memberId, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
+                  .subtract(amount));
         }
       }
     }
