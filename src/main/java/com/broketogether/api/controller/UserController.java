@@ -32,7 +32,7 @@ public class UserController {
   @GetMapping("/me")
   public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal User currentUser) {
 
-    return ResponseEntity.ok(new UserResponse(currentUser.getId(), currentUser.getName(),currentUser.getEmail()));
+    return ResponseEntity.ok(new UserResponse(currentUser.getId(), currentUser.getName(),currentUser.getEmail(),currentUser.getPremium(),currentUser.getSubscriptionStatus()));
   }
 
   /**
