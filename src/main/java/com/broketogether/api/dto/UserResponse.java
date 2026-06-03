@@ -1,4 +1,6 @@
 package com.broketogether.api.dto;
 
-public record UserResponse(Long id, String name, String email) {
+import com.broketogether.api.model.SubscriptionStatus;
+
+public record UserResponse(Long id, String name, String email, Boolean isPremium, SubscriptionStatus subscriptionStatus) {
 }

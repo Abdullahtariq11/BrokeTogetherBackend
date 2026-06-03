@@ -59,7 +59,7 @@ public class UserService extends Utility {
   public List<UserResponse> getAllUser() {
     List<User> users= userRepository.findAll();
 
-    return users.stream().map(u->new UserResponse(u.getId(),u.getName(),u.getEmail())).toList();
+    return users.stream().map(u->new UserResponse(u.getId(),u.getName(),u.getEmail(),u.getPremium(),u.getSubscriptionStatus())).toList();
   }
 
   /**
@@ -68,7 +68,7 @@ public class UserService extends Utility {
    */
   public Optional<UserResponse> getUserByEmail(String email) {
     return this.userRepository.findByEmail(email)
-            .map(u-> new UserResponse(u.getId(),u.getName(),u.getEmail()));
+            .map(u-> new UserResponse(u.getId(),u.getName(),u.getEmail(),u.getPremium(),u.getSubscriptionStatus()));
   }
 
   /**
@@ -86,7 +86,7 @@ public class UserService extends Utility {
     user.setPassword(encodedPassword);
     User savedUser= userRepository.save(user);
 
-    return new UserResponse(savedUser.getId(), savedUser.getName(), savedUser.getEmail());
+    return new UserResponse(savedUser.getId(), savedUser.getName(), savedUser.getEmail(),savedUser.getPremium(),savedUser.getSubscriptionStatus());
   }
 
   /**
@@ -178,7 +178,7 @@ public class UserService extends Utility {
     userDetails.setName(name);
     User savedUser =userRepository.save(userDetails);
 
-    return new UserResponse(savedUser.getId(), savedUser.getName(), savedUser.getEmail());
+    return new UserResponse(savedUser.getId(), savedUser.getName(), savedUser.getEmail(),savedUser.getPremium(),savedUser.getSubscriptionStatus());
   }
 
 }

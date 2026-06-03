@@ -9,6 +9,9 @@ target/
 .env.local
 .env.*.local
 
+### Local dev profile (contains credentials) ###
+src/main/resources/application-local.properties
+
 ### STS ###
 .apt_generated
 .classpath

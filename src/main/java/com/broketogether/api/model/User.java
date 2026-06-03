@@ -16,6 +16,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -24,7 +26,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 /**
- * User entity class , holds infroamtion for user.
+ * User entity class , holds information for user.
  */
 @Entity
 @Table(name = "users") // map to users table
@@ -51,6 +53,43 @@ public class User implements UserDetails {
   @Column(nullable = false, length = 100)
   private String role;
 
+  @Column(name = "is_premium",nullable = false)
+  private Boolean isPremium= false;
+
+  @Column(name = "stripe_customer_id",nullable = true)
+  private String stripeCustomerId;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "subscription_status",nullable = false)
+  private SubscriptionStatus subscriptionStatus= SubscriptionStatus.NONE;
+
+  public SubscriptionStatus getSubscriptionStatus() {
+    return subscriptionStatus;
+  }
+
+  public void setSubscriptionStatus(SubscriptionStatus subscriptionStatus) {
+    this.subscriptionStatus = subscriptionStatus;
+  }
+
+  public String getSubscriptionId() {
+    return subscriptionId;
+  }
+
+  public void setSubscriptionId(String subscriptionId) {
+    this.subscriptionId = subscriptionId;
+  }
+
+  public String getStripeCustomerId() {
+    return stripeCustomerId;
+  }
+
+  public void setStripeCustomerId(String stripeCustomerId) {
+    this.stripeCustomerId = stripeCustomerId;
+  }
+
+  @Column(name = "subscription_id",nullable = true)
+  private String subscriptionId;
+
   @ManyToMany(mappedBy = "members")
   @JsonIgnore // Crucial: prevents infinite loops in JSON responses
   private Set<Home> homes = new HashSet<>();
@@ -64,7 +103,6 @@ public class User implements UserDetails {
    * JPA requires no args constructor
    */
   public User() {
-
   }
 
   /**
@@ -161,6 +199,14 @@ public class User implements UserDetails {
    */
   public Set<Home> getHomes() {
     return homes;
+  }
+
+  public Boolean getPremium() {
+    return isPremium;
+  }
+
+  public void setPremium(Boolean premium) {
+    isPremium = premium;
   }
 
   /**
