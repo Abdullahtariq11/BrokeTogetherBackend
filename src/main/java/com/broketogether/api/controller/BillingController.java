@@ -32,6 +32,12 @@ public class BillingController {
         return ResponseEntity.ok(billingService.getStatus()) ;
     }
 
+    @PostMapping("/portal")
+    public ResponseEntity<String> portal(@AuthenticationPrincipal User currentUser) throws StripeException {
+        String url = billingService.createPortalSession(currentUser);
+        return ResponseEntity.ok(url);
+    }
+
     @PostMapping("/webhook")
     public ResponseEntity<String> webhook(
             @RequestBody String payload,

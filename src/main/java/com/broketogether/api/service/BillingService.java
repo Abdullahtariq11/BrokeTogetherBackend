@@ -64,6 +64,23 @@ public class BillingService extends Utility {
         return session.getUrl();
     }
 
+    public String createPortalSession(User user) throws StripeException {
+        if (user.getStripeCustomerId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active subscription found.");
+        }
+
+        com.stripe.param.billingportal.SessionCreateParams params =
+            com.stripe.param.billingportal.SessionCreateParams.builder()
+                .setCustomer(user.getStripeCustomerId())
+                .setReturnUrl(frontendUrl + "/billing")
+                .build();
+
+        com.stripe.model.billingportal.Session session =
+            com.stripe.model.billingportal.Session.create(params);
+
+        return session.getUrl();
+    }
+
     public BillingStatusResponse getStatus() throws AccountNotFoundException {
         User user = getUserDetails();
         return new BillingStatusResponse(user.getPremium(), user.getSubscriptionStatus());
