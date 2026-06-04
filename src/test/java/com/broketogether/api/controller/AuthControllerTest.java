@@ -138,7 +138,7 @@ public class AuthControllerTest {
     @Test
     @DisplayName("Should register successfully with valid data")
     void shouldRegisterSuccessfully() throws Exception {
-      when(userService.saveUser(any(User.class))).thenReturn(new UserResponse((long) 100.0, "Test User", "test@example.com"));
+      when(userService.saveUser(any(User.class))).thenReturn(new UserResponse((long) 100.0, "Test User", "test@example.com", false, com.broketogether.api.model.SubscriptionStatus.NONE));
 
       mockMvc.perform(post("/api/v1/auth/register")
               .contentType(MediaType.APPLICATION_JSON)

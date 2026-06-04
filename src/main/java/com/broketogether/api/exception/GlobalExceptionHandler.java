@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.broketogether.api.dto.ErrorResponse;
 
@@ -74,6 +75,13 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleUsernameNotFound(
       org.springframework.security.core.userdetails.UsernameNotFoundException ex) {
     return build(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+  }
+
+  // ResponseStatusException — used in services to throw HTTP errors directly (e.g. Stripe billing)
+  @ExceptionHandler(ResponseStatusException.class)
+  public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex) {
+    HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
+    return build(status, ex.getReason());
   }
 
   // 500 — genuine unexpected errors; message is intentionally hidden from the client
