@@ -6,10 +6,7 @@ import com.broketogether.api.service.BillingService;
 import com.stripe.exception.StripeException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.security.auth.login.AccountNotFoundException;
 
@@ -34,6 +31,16 @@ public class BillingController {
     public ResponseEntity<BillingStatusResponse> getStatus() throws AccountNotFoundException {
         return ResponseEntity.ok(billingService.getStatus()) ;
     }
+
+    @PostMapping("/webhook")
+    public ResponseEntity<String> webhook(
+            @RequestBody String payload,
+            @RequestHeader("Stripe-Signature") String sigHeader) throws StripeException {
+        billingService.handleWebhook(payload, sigHeader);
+        return ResponseEntity.ok("received");
+    }
+
+
 
 
 }
