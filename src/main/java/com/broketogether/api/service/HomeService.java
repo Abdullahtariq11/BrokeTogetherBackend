@@ -10,6 +10,7 @@ import com.broketogether.api.exception.ConflictException;
 import com.broketogether.api.exception.ForbiddenException;
 import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.utility.Utility;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import com.broketogether.api.model.Home;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.HomeRepository;
 import com.broketogether.api.repository.UserRepository;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class HomeService extends Utility {
@@ -41,13 +43,15 @@ public class HomeService extends Utility {
   @Transactional
   public HomeResponse createHome(String name) throws AccountNotFoundException {
     User userDetails = getUserDetails();
-
     User managedUser = userRepository.findById(userDetails.getId()).get();
-
+    if (!managedUser.getPremium() && !managedUser.getHomes().isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+              "Free plan is limited to 1 household. Upgrade to Premium for multiple households.");
+    }
     Home home = new Home();
     home.setName(name);
     home.setCreator(managedUser);
-    home.getMembers().add(userDetails);
+    home.getMembers().add(managedUser);
     Home homeCreated = homeRepository.save(home);
     return new HomeResponse(homeCreated.getId(), homeCreated.getName(),
         homeCreated.getInviteCode(),homeCreated.getCreator().getId());
