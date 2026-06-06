@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.broketogether.api.service.AnalyticsService;
 import com.broketogether.api.service.ExpenseService;
 import com.broketogether.api.service.ExportService;
 
@@ -29,10 +30,13 @@ public class ExpenseController {
 
   private final ExpenseService expenseService;
   private final ExportService exportService;
+  private final AnalyticsService analyticsService;
 
-  public ExpenseController(ExpenseService expenseService, ExportService exportService) {
+  public ExpenseController(ExpenseService expenseService, ExportService exportService,
+      AnalyticsService analyticsService) {
     this.expenseService = expenseService;
     this.exportService = exportService;
+    this.analyticsService = analyticsService;
   }
 
   @PostMapping
@@ -85,6 +89,12 @@ public class ExpenseController {
   public ResponseEntity<List<SettlementSuggestion>> getSettlements(@PathVariable Long homeId)
           throws AccountNotFoundException {
     return ResponseEntity.ok(expenseService.getSettlements(homeId));
+  }
+
+  @GetMapping("/home/{homeId}/analytics")
+  public ResponseEntity<AnalyticsResponse> getAnalytics(@PathVariable Long homeId)
+      throws AccountNotFoundException {
+    return ResponseEntity.ok(analyticsService.getAnalytics(homeId));
   }
 
   @GetMapping("/home/{homeId}/export")
