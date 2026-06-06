@@ -77,9 +77,17 @@ public class ExportService extends Utility {
         PdfDocument pdfDoc = new PdfDocument(pdfWriter);
         Document document = new Document(pdfDoc);
 
-        // Title
+        // App name header
+        document.add(new Paragraph("BrokeTogether")
+                .setBold().setFontSize(24).setMarginBottom(2));
+
+        // Subtitle — household name + report label
         document.add(new Paragraph(home.getName() + " — Expense Report")
-                .setBold().setFontSize(18).setMarginBottom(10));
+                .setFontSize(14).setMarginBottom(4));
+
+        // Generated date
+        document.add(new Paragraph("Generated: " + java.time.LocalDate.now())
+                .setFontSize(10).setMarginBottom(14));
 
         // Table with 5 columns
         Table table = new Table(UnitValue.createPercentArray(new float[]{20, 25, 15, 15, 25}))
@@ -125,7 +133,9 @@ public class ExportService extends Utility {
         Home home = homeRepository.findById(homeId)
                 .orElseThrow(() -> new RuntimeException("Home not found."));
 
-        if (!home.getMembers().contains(user)) {
+        boolean isMember = home.getMembers().stream()
+                .anyMatch(m -> m.getId().equals(user.getId()));
+        if (!isMember) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "You are not a member of this home.");
         }

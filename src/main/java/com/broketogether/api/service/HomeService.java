@@ -88,7 +88,9 @@ public class HomeService extends Utility {
     Home home = homeRepository.findByInviteCode(inviteCode)
         .orElseThrow(() -> new ResourceNotFoundException("Invalid invite code."));
     User userDetails = getUserDetails();
-    if (home.getMembers().contains(userDetails)) {
+    boolean alreadyMember = home.getMembers().stream()
+        .anyMatch(m -> m.getId().equals(userDetails.getId()));
+    if (alreadyMember) {
       throw new ConflictException("User is already a member of this home.");
     }
     home.getMembers().add(userDetails);
