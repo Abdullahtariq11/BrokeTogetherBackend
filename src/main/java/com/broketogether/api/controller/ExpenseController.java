@@ -18,17 +18,21 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.broketogether.api.service.ExpenseService;
+import com.broketogether.api.service.ExportService;
 
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 
 @RestController
 @RequestMapping("/api/v1/expenses")
 public class ExpenseController {
 
   private final ExpenseService expenseService;
+  private final ExportService exportService;
 
-  public ExpenseController(ExpenseService expenseService) {
+  public ExpenseController(ExpenseService expenseService, ExportService exportService) {
     this.expenseService = expenseService;
+    this.exportService = exportService;
   }
 
   @PostMapping
@@ -81,6 +85,26 @@ public class ExpenseController {
   public ResponseEntity<List<SettlementSuggestion>> getSettlements(@PathVariable Long homeId)
           throws AccountNotFoundException {
     return ResponseEntity.ok(expenseService.getSettlements(homeId));
+  }
+
+  @GetMapping("/home/{homeId}/export")
+  public ResponseEntity<byte[]> export(
+      @PathVariable Long homeId,
+      @RequestParam String format) throws Exception {
+
+    if ("pdf".equalsIgnoreCase(format)) {
+      byte[] pdf = exportService.exportPdf(homeId);
+      return ResponseEntity.ok()
+          .header("Content-Disposition", "attachment; filename=expenses.pdf")
+          .contentType(MediaType.APPLICATION_PDF)
+          .body(pdf);
+    } else {
+      byte[] csv = exportService.exportCsv(homeId);
+      return ResponseEntity.ok()
+          .header("Content-Disposition", "attachment; filename=expenses.csv")
+          .contentType(MediaType.parseMediaType("text/csv"))
+          .body(csv);
+    }
   }
 
 }
