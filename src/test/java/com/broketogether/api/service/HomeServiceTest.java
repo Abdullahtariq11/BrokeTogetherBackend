@@ -27,6 +27,7 @@ import com.broketogether.api.dto.MemberResponse;
 import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.User;
+import org.springframework.web.server.ResponseStatusException;
 import com.broketogether.api.repository.HomeRepository;
 import com.broketogether.api.repository.UserRepository;
 
@@ -87,6 +88,49 @@ public class HomeServiceTest {
       assertNotNull(response);
       assertEquals("My Apartment", response.getName());
       assertEquals("ABC12345", response.getInviteCode());
+      verify(homeRepository, times(1)).save(any(Home.class));
+    }
+
+    @Test
+    @DisplayName("Should throw 403 when free user tries to create a second household")
+    public void shouldThrowForbiddenWhenFreeUserCreatesSecondHome() {
+      // Free user already has one home
+      Home existingHome = new Home();
+      existingHome.setId(1L);
+      existingHome.setName("Existing Home");
+      testUser.getHomes().add(existingHome);
+
+      when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+
+      ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+          () -> homeService.createHome("Second Home"));
+
+      assertEquals(403, exception.getStatusCode().value());
+    }
+
+    @Test
+    @DisplayName("Should allow premium user to create multiple households")
+    public void shouldAllowPremiumUserToCreateMultipleHomes() throws Exception {
+      // Premium user already has one home
+      testUser.setPremium(true);
+      Home existingHome = new Home();
+      existingHome.setId(1L);
+      existingHome.setName("First Home");
+      testUser.getHomes().add(existingHome);
+
+      Home secondHome = new Home();
+      secondHome.setId(2L);
+      secondHome.setName("Second Home");
+      secondHome.setInviteCode("XYZ99999");
+      secondHome.setCreator(testUser);
+
+      when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+      when(homeRepository.save(any(Home.class))).thenReturn(secondHome);
+
+      HomeResponse response = homeService.createHome("Second Home");
+
+      assertNotNull(response);
+      assertEquals("Second Home", response.getName());
       verify(homeRepository, times(1)).save(any(Home.class));
     }
   }
