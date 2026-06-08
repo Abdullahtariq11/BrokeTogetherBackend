@@ -20,11 +20,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
    */
   Optional<User> findByEmail(String email);
 
+  Optional<User> findByEmailIgnoreCase(String email);
+
   /**
    * @param email is used to check if user exist
    * @return true/false depending on if user exists
    */
   boolean existsByEmail(String email);
+
+  boolean existsByEmailIgnoreCase(String email);
 
   Optional<User> findByStripeCustomerId(String stripeCustomerId);
 }
