@@ -7,10 +7,8 @@ import com.broketogether.api.dto.PasswordResetRequest;
 import com.broketogether.api.dto.UserResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import com.broketogether.api.model.User;
 import com.broketogether.api.service.UserService;
 
 @RestController
@@ -30,9 +28,9 @@ public class UserController {
    * @return UserResponse with the current user's profile
    */
   @GetMapping("/me")
-  public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal User currentUser) {
-
-    return ResponseEntity.ok(new UserResponse(currentUser.getId(), currentUser.getName(),currentUser.getEmail(),currentUser.getPremium(),currentUser.getSubscriptionStatus()));
+  public ResponseEntity<UserResponse> getCurrentUser() throws AccountNotFoundException {
+    // Always fetch fresh from DB so fields like isPremium reflect the latest state
+    return ResponseEntity.ok(userService.getProfile());
   }
 
   /**
