@@ -80,7 +80,7 @@ public class UserService extends Utility {
   public UserResponse saveUser(User user) {
     // Normalize email to lowercase so ABC@gmail.com and abc@gmail.com are the same account
     user.setEmail(user.getEmail().toLowerCase().trim());
-    if (this.userRepository.existsByEmail(user.getEmail())) {
+    if (this.userRepository.existsByEmailIgnoreCase(user.getEmail())) {
       throw new ConflictException("Email already in use!");
     }
     String rawPassword = user.getPassword();

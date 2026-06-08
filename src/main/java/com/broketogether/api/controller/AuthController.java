@@ -174,7 +174,7 @@ public class AuthController {
     String name  = (String) profile.getOrDefault("name", email);
 
     // Find or create the user (mirrors OAuth2SuccessHandler logic)
-    User user = userRepository.findByEmail(email).orElseGet(() -> {
+    User user = userRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
       User newUser = new User(name, email,
           passwordEncoder.encode(UUID.randomUUID().toString()));
       return userRepository.save(newUser);

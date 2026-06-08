@@ -125,7 +125,7 @@ public class BillingService extends Utility {
                             ? session.getCustomerDetails().getEmail()
                             : session.getCustomerEmail();
                     if (email != null) {
-                        userOpt = userRepository.findByEmail(email);
+                        userOpt = userRepository.findByEmailIgnoreCase(email.trim());
                     }
                 }
 
