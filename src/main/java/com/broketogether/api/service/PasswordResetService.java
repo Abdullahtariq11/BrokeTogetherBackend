@@ -39,7 +39,7 @@ public class PasswordResetService {
    */
   @Transactional
   public void initiateReset(String email) {
-    userRepository.findByEmail(email).ifPresent(user -> {
+    userRepository.findByEmail(email.toLowerCase().trim()).ifPresent(user -> {
       // Delete any existing tokens for this user
       tokenRepository.deleteByUser(user);
 

@@ -48,18 +48,35 @@ public class AnalyticsService extends Utility {
                 "You are not a member of this home.");
         }
 
-        List<Expense> expenses = expenseRepository.findByHomeId(homeId);
+        List<Expense> allExpenses = expenseRepository.findByHomeId(homeId);
 
-        // Spending by category
-        Map<String, BigDecimal> byCategory = expenses.stream()
+        // Settlements paid by current user (money they paid back to others)
+        BigDecimal totalSettlements = allExpenses.stream()
+            .filter(e -> "SETTLEMENT".equalsIgnoreCase(e.getCategory()))
+            .filter(e -> e.getPayer() != null && e.getPayer().getId().equals(user.getId()))
+            .map(Expense::getAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Real expenses only (no settlements) for category/monthly breakdowns
+        List<Expense> realExpenses = allExpenses.stream()
+            .filter(e -> !"SETTLEMENT".equalsIgnoreCase(e.getCategory()))
+            .collect(Collectors.toList());
+
+        // Personal expenses — only where current user is the payer
+        List<Expense> myExpenses = realExpenses.stream()
+            .filter(e -> e.getPayer() != null && e.getPayer().getId().equals(user.getId()))
+            .collect(Collectors.toList());
+
+        // Spending by category — current user's own payments only
+        Map<String, BigDecimal> byCategory = myExpenses.stream()
             .collect(Collectors.groupingBy(
                 e -> e.getCategory() != null ? e.getCategory() : "General",
                 Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)
             ));
 
-        // Monthly totals — last 6 months
+        // Monthly totals — current user's payments last 6 months
         LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
-        Map<String, BigDecimal> monthly = expenses.stream()
+        Map<String, BigDecimal> monthly = myExpenses.stream()
             .filter(e -> e.getCreatedAt() != null && e.getCreatedAt().isAfter(sixMonthsAgo))
             .collect(Collectors.groupingBy(
                 e -> e.getCreatedAt().getYear() + "-" +
@@ -67,16 +84,16 @@ public class AnalyticsService extends Utility {
                 Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)
             ));
 
-        // Spending by member (payer)
-        Map<String, BigDecimal> byMember = expenses.stream()
+        // Spending by member — all real expenses (excluding settlements) to show household contribution
+        Map<String, BigDecimal> byMember = realExpenses.stream()
             .filter(e -> e.getPayer() != null)
             .collect(Collectors.groupingBy(
                 e -> e.getPayer().getName(),
                 Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)
             ));
 
-        // Largest expense
-        Expense largest = expenses.stream()
+        // Largest expense — current user's own expenses only
+        Expense largest = myExpenses.stream()
             .max(Comparator.comparing(Expense::getAmount))
             .orElse(null);
 
@@ -85,7 +102,8 @@ public class AnalyticsService extends Utility {
             monthly,
             byMember,
             largest != null ? largest.getAmount() : BigDecimal.ZERO,
-            largest != null ? largest.getDescription() : "N/A"
+            largest != null ? largest.getDescription() : "N/A",
+            totalSettlements
         );
     }
 }

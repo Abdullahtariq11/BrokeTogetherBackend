@@ -8,5 +8,6 @@ public record AnalyticsResponse(
     Map<String, BigDecimal> monthlyTotals,
     Map<String, BigDecimal> spendingByMember,
     BigDecimal largestExpenseAmount,
-    String largestExpenseDescription
+    String largestExpenseDescription,
+    BigDecimal totalSettlements
 ) {}
