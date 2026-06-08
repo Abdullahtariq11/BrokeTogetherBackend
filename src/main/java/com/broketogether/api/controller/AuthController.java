@@ -170,7 +170,7 @@ public class AuthController {
       throw new IllegalArgumentException("Invalid Google access token.");
     }
 
-    String email = (String) profile.get("email");
+    String email = ((String) profile.get("email")).toLowerCase().trim();
     String name  = (String) profile.getOrDefault("name", email);
 
     // Find or create the user (mirrors OAuth2SuccessHandler logic)

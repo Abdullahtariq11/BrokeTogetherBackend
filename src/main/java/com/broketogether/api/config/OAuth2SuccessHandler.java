@@ -36,7 +36,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                                         HttpServletResponse response,
                                         Authentication authentication) throws java.io.IOException {
         OAuth2User oauth2User = (OAuth2User) authentication.getPrincipal();
-        String email = oauth2User.getAttribute("email");
+        String email = ((String) oauth2User.getAttribute("email")).toLowerCase().trim();
         String name  = oauth2User.getAttribute("name");
 
         User user = userRepository.findByEmail(email).orElseGet(() -> {
