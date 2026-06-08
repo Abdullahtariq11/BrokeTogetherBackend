@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.security.auth.login.AccountNotFoundException;
+import java.util.Optional;
 
 @Service
 public class BillingService extends Utility {
@@ -50,6 +51,7 @@ public class BillingService extends Utility {
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
                 .setCustomerEmail(user.getEmail())
+                .setClientReferenceId(user.getId().toString())
                 .setSuccessUrl(frontendUrl + "/billing?success=true")
                 .setCancelUrl(frontendUrl + "/billing?cancelled=true")
                 .addLineItem(
@@ -105,7 +107,29 @@ public class BillingService extends Utility {
 
             case "checkout.session.completed" -> {
                 Session session = (Session) stripeObject;
-                userRepository.findByEmail(session.getCustomerEmail()).ifPresent(user -> {
+
+                // Find user by clientReferenceId (most reliable — set at checkout creation)
+                // Fall back to customerDetails.email if clientReferenceId is missing
+                Optional<User> userOpt = Optional.empty();
+
+                String refId = session.getClientReferenceId();
+                if (refId != null && !refId.isBlank()) {
+                    try {
+                        userOpt = userRepository.findById(Long.parseLong(refId));
+                    } catch (NumberFormatException ignored) {}
+                }
+
+                if (userOpt.isEmpty()) {
+                    // Fallback: try customerDetails email (set after checkout)
+                    String email = session.getCustomerDetails() != null
+                            ? session.getCustomerDetails().getEmail()
+                            : session.getCustomerEmail();
+                    if (email != null) {
+                        userOpt = userRepository.findByEmail(email);
+                    }
+                }
+
+                userOpt.ifPresent(user -> {
                     user.setPremium(true);
                     user.setStripeCustomerId(session.getCustomer());
                     user.setSubscriptionId(session.getSubscription());

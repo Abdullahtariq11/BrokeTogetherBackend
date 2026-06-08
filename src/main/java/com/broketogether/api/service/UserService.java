@@ -150,6 +150,17 @@ public class UserService extends Utility {
    * @param currentPassword user's current password
    * @param newPassword user's new password
    */
+  /**
+   * Returns the current user's profile fetched fresh from the DB.
+   */
+  public UserResponse getProfile() throws AccountNotFoundException {
+    User userDetails = getUserDetails();
+    // Reload from DB to get the latest field values (e.g. isPremium after webhook)
+    User fresh = userRepository.findById(userDetails.getId())
+        .orElseThrow(() -> new AccountNotFoundException("User not found"));
+    return new UserResponse(fresh.getId(), fresh.getName(), fresh.getEmail(), fresh.getPremium(), fresh.getSubscriptionStatus());
+  }
+
   public void resetPassword(String currentPassword, String newPassword) throws AccountNotFoundException {
     User userDetails = getUserDetails();
     // Reload fresh from DB — SecurityContext principal may not have the latest password hash
