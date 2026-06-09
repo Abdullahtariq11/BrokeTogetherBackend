@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import jakarta.annotation.PostConstruct;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -73,6 +74,15 @@ public class JwtUtils {
    *
    * @return SecretKey object for signing/verifying JWTs
    */
+  @PostConstruct
+  public void validateSecret() {
+    if (jwtSecret == null || jwtSecret.length() < 64) {
+      throw new IllegalStateException(
+          "JWT_SECRET must be at least 64 characters for HS512. Current length: " +
+          (jwtSecret == null ? "null" : jwtSecret.length()));
+    }
+  }
+
   private SecretKey getSigningKey() {
     return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
   }

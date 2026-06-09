@@ -9,6 +9,8 @@ import com.broketogether.api.model.ShoppingItem;
 import com.broketogether.api.model.User;
 import com.broketogether.api.exception.ConflictException;
 import com.broketogether.api.exception.ResourceNotFoundException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import com.broketogether.api.repository.HomeRepository;
 import com.broketogether.api.repository.ShoppingItemRepository;
 import com.broketogether.api.utility.Utility;
@@ -111,6 +113,15 @@ public class ShoppingItemService extends Utility {
                 .orElseThrow(() -> new ResourceNotFoundException("No shopping Item found with this id."));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(shoppingItem.getHome(), userDetails);
+
+        // Only item creator or home admin can delete
+        boolean isCreator = shoppingItem.getAddedBy().getId().equals(userDetails.getId());
+        boolean isHomeAdmin = shoppingItem.getHome().getCreator().getId().equals(userDetails.getId());
+        if (!isCreator && !isHomeAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Only the item creator or home admin can delete this item.");
+        }
+
         shoppingItemRepository.deleteById(itemId);
     }
 
@@ -128,6 +139,15 @@ public class ShoppingItemService extends Utility {
                 .orElseThrow(() -> new ResourceNotFoundException("No shopping Item found with this id."));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(shoppingItem.getHome(), userDetails);
+
+        // Only item creator or home admin can edit
+        boolean isCreator = shoppingItem.getAddedBy().getId().equals(userDetails.getId());
+        boolean isHomeAdmin = shoppingItem.getHome().getCreator().getId().equals(userDetails.getId());
+        if (!isCreator && !isHomeAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Only the item creator or home admin can edit this item.");
+        }
+
         shoppingItem.setName(itemRequest.name());
         shoppingItem.setPrice(itemRequest.price());
 

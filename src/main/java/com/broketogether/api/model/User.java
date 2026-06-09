@@ -90,6 +90,13 @@ public class User implements UserDetails {
   @Column(name = "subscription_id",nullable = true)
   private String subscriptionId;
 
+  // Account lockout — tracks failed login attempts
+  @Column(name = "failed_login_attempts", nullable = false)
+  private int failedLoginAttempts = 0;
+
+  @Column(name = "locked_until", nullable = true)
+  private LocalDateTime lockedUntil;
+
   @ManyToMany(mappedBy = "members")
   @JsonIgnore // Crucial: prevents infinite loops in JSON responses
   private Set<Home> homes = new HashSet<>();
@@ -252,9 +259,16 @@ public class User implements UserDetails {
     return true;
   }
 
+  public int getFailedLoginAttempts() { return failedLoginAttempts; }
+  public void setFailedLoginAttempts(int failedLoginAttempts) { this.failedLoginAttempts = failedLoginAttempts; }
+
+  public LocalDateTime getLockedUntil() { return lockedUntil; }
+  public void setLockedUntil(LocalDateTime lockedUntil) { this.lockedUntil = lockedUntil; }
+
   @Override
   public boolean isAccountNonLocked() {
-    return true;
+    // Account is locked if lockedUntil is set and is in the future
+    return lockedUntil == null || lockedUntil.isBefore(LocalDateTime.now());
   }
 
   @Override

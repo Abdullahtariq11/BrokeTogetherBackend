@@ -179,6 +179,8 @@ public class SecurityConfig {
     
     http
     .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+    // CSRF disabled: app uses stateless JWT in Authorization header (not cookies).
+    // JWT-based auth is inherently CSRF-safe — no session cookies to hijack.
     .csrf(csrf -> csrf.disable())
     .sessionManagement(
         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

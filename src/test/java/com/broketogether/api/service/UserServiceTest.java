@@ -169,7 +169,7 @@ public class UserServiceTest {
       User user = new User("New User", "new@example.com", "rawPassword");
       user.setId(1L);
 
-      when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+      when(userRepository.existsByEmailIgnoreCase("new@example.com")).thenReturn(false);
       when(passwordEncoder.encode("rawPassword")).thenReturn("encodedPassword");
       when(userRepository.save(any(User.class))).thenReturn(user);
 
@@ -188,7 +188,7 @@ public class UserServiceTest {
     void shouldThrowExceptionWhenEmailAlreadyInUse() {
       User user = new User("Duplicate User", "existing@example.com", "password");
 
-      when(userRepository.existsByEmail("existing@example.com")).thenReturn(true);
+      when(userRepository.existsByEmailIgnoreCase("existing@example.com")).thenReturn(true);
 
       RuntimeException exception = assertThrows(RuntimeException.class,
           () -> userService.saveUser(user));
@@ -202,7 +202,7 @@ public class UserServiceTest {
     void shouldSetEncodedPasswordOnUser() {
       User user = new User("User", "user@example.com", "myPassword");
 
-      when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
+      when(userRepository.existsByEmailIgnoreCase("user@example.com")).thenReturn(false);
       when(passwordEncoder.encode("myPassword")).thenReturn("$2a$10$encodedHash");
       when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
