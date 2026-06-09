@@ -1,9 +1,11 @@
 package com.broketogether.api.scheduler;
 
 import com.broketogether.api.model.Expense;
+import com.broketogether.api.model.ExpenseSplit;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.RecurringExpense;
 import com.broketogether.api.model.RecurringFrequency;
+import com.broketogether.api.model.RecurringSplitType;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.ExpenseRepository;
 import com.broketogether.api.repository.HomeRepository;
@@ -12,6 +14,12 @@ import com.broketogether.api.repository.UserRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -58,6 +66,27 @@ public class RecurringExpenseScheduler {
                 expense.setCategory(recurring.getCategory());
                 expense.setPayer(payer);
                 expense.setHome(home);
+
+                // Split based on splitType
+                if (recurring.getSplitType() == RecurringSplitType.SPLIT) {
+                    // Divide equally among all home members
+                    Set<User> members = home.getMembers();
+                    if (!members.isEmpty()) {
+                        BigDecimal splitAmount = recurring.getAmount()
+                            .divide(BigDecimal.valueOf(members.size()), 2, RoundingMode.HALF_UP);
+                        List<ExpenseSplit> splits = new ArrayList<>();
+                        for (User member : members) {
+                            splits.add(new ExpenseSplit(expense, member, splitAmount));
+                        }
+                        expense.setSplits(splits);
+                    }
+                } else {
+                    // Personal — only the payer owes the full amount
+                    List<ExpenseSplit> splits = new ArrayList<>();
+                    splits.add(new ExpenseSplit(expense, payer, recurring.getAmount()));
+                    expense.setSplits(splits);
+                }
+
                 expenseRepository.save(expense);
 
                 // Advance the next due date

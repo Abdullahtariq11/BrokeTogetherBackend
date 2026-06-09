@@ -55,6 +55,7 @@ public class RecurringExpenseService extends Utility {
         recurring.setCategory(request.getCategory());
         recurring.setPayerId(user.getId());
         recurring.setFrequency(request.getFrequency());
+        recurring.setSplitType(request.getSplitType() != null ? request.getSplitType() : com.broketogether.api.model.RecurringSplitType.SPLIT);
         recurring.setNextDueDate(LocalDate.now());
         recurring.setActive(true);
 
@@ -102,7 +103,8 @@ public class RecurringExpenseService extends Utility {
     private RecurringExpenseResponse toResponse(RecurringExpense r) {
         return new RecurringExpenseResponse(
             r.getId(), r.getHomeId(), r.getDescription(), r.getAmount(),
-            r.getCategory(), r.getPayerId(), r.getFrequency(), r.getNextDueDate(), r.isActive()
+            r.getCategory(), r.getPayerId(), r.getFrequency(), r.getSplitType(),
+            r.getNextDueDate(), r.isActive()
         );
     }
 }
