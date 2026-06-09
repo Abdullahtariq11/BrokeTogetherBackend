@@ -1,6 +1,7 @@
 package com.broketogether.api.dto;
 
 import com.broketogether.api.model.RecurringFrequency;
+import com.broketogether.api.model.RecurringSplitType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,6 +24,8 @@ public class RecurringExpenseRequest {
     @NotNull(message = "Frequency is required")
     private RecurringFrequency frequency;
 
+    private RecurringSplitType splitType = RecurringSplitType.SPLIT;
+
     public Long getHomeId() { return homeId; }
     public void setHomeId(Long homeId) { this.homeId = homeId; }
 
@@ -37,4 +40,7 @@ public class RecurringExpenseRequest {
 
     public RecurringFrequency getFrequency() { return frequency; }
     public void setFrequency(RecurringFrequency frequency) { this.frequency = frequency; }
+
+    public RecurringSplitType getSplitType() { return splitType; }
+    public void setSplitType(RecurringSplitType splitType) { this.splitType = splitType; }
 }

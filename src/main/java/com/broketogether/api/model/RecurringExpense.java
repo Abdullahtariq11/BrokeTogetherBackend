@@ -31,6 +31,10 @@ public class RecurringExpense {
     @Column(nullable = false)
     private RecurringFrequency frequency;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RecurringSplitType splitType = RecurringSplitType.SPLIT;
+
     @Column(nullable = false)
     private LocalDate nextDueDate;
 
@@ -59,6 +63,9 @@ public class RecurringExpense {
 
     public RecurringFrequency getFrequency() { return frequency; }
     public void setFrequency(RecurringFrequency frequency) { this.frequency = frequency; }
+
+    public RecurringSplitType getSplitType() { return splitType; }
+    public void setSplitType(RecurringSplitType splitType) { this.splitType = splitType; }
 
     public LocalDate getNextDueDate() { return nextDueDate; }
     public void setNextDueDate(LocalDate nextDueDate) { this.nextDueDate = nextDueDate; }
