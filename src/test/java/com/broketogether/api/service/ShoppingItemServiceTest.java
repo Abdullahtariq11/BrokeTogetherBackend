@@ -65,6 +65,7 @@ class ShoppingItemServiceTest {
         testHome.setId(1L);
         testHome.setName("Test Home");
         testHome.setMembers(new HashSet<>(Set.of(testUser, otherUser)));
+        testHome.setCreator(testUser); // testUser is both member and admin
 
         testItem = new ShoppingItem(LocalDateTime.now(), testHome, null, testUser,
                 false, new BigDecimal("10.00"), "Milk");
