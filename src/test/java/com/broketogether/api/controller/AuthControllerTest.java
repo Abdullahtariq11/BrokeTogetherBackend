@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.broketogether.api.config.JwtUtils;
 import com.broketogether.api.exception.GlobalExceptionHandler;
 import com.broketogether.api.model.User;
+import com.broketogether.api.service.LoginAttemptService;
 import com.broketogether.api.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -42,6 +43,9 @@ public class AuthControllerTest {
 
   @Mock
   private JwtUtils jwtUtils;
+
+  @Mock
+  private LoginAttemptService loginAttemptService;
 
   @InjectMocks
   private AuthController authController;
@@ -121,6 +125,7 @@ public class AuthControllerTest {
     void shouldReturnErrorWhenCredentialsInvalid() throws Exception {
       when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
           .thenThrow(new BadCredentialsException("Bad credentials"));
+      when(loginAttemptService.getLockMessage(any())).thenReturn(null); // not locked yet
 
       mockMvc.perform(post("/api/v1/auth/login")
               .contentType(MediaType.APPLICATION_JSON)

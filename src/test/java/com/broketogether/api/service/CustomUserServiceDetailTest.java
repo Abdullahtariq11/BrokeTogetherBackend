@@ -32,24 +32,24 @@ public class CustomUserServiceDetailTest {
     User user = new User("Test User", "test@example.com", "password");
     user.setId(1L);
 
-    when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+    when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(user));
 
     UserDetails result = customUserServiceDetail.loadUserByUsername("test@example.com");
 
     assertNotNull(result);
     assertEquals("test@example.com", result.getUsername());
-    verify(userRepository, times(1)).findByEmail("test@example.com");
+    verify(userRepository, times(1)).findByEmailIgnoreCase("test@example.com");
   }
 
   @Test
   @DisplayName("Should throw UsernameNotFoundException when user not found")
   void shouldThrowExceptionWhenUserNotFound() {
-    when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
+    when(userRepository.findByEmailIgnoreCase("missing@example.com")).thenReturn(Optional.empty());
 
     UsernameNotFoundException exception = assertThrows(UsernameNotFoundException.class,
         () -> customUserServiceDetail.loadUserByUsername("missing@example.com"));
 
     assertEquals("User not found with email: missing@example.com", exception.getMessage());
-    verify(userRepository, times(1)).findByEmail("missing@example.com");
+    verify(userRepository, times(1)).findByEmailIgnoreCase("missing@example.com");
   }
 }

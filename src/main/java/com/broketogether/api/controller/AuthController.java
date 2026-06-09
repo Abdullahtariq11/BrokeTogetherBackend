@@ -24,8 +24,12 @@ import com.broketogether.api.dto.RegisterRequest;
 import com.broketogether.api.dto.TokenResetPasswordRequest;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.UserRepository;
+import com.broketogether.api.service.LoginAttemptService;
 import com.broketogether.api.service.PasswordResetService;
 import com.broketogether.api.service.UserService;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
+import org.springframework.http.HttpStatus;
 
 import java.util.Map;
 import java.util.UUID;
@@ -40,16 +44,19 @@ public class AuthController {
   private final PasswordResetService passwordResetService;
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
+  private final LoginAttemptService loginAttemptService;
 
   public AuthController(UserService userService, AuthenticationManager authenticationManager,
       JwtUtils jwtUtils, PasswordResetService passwordResetService,
-      UserRepository userRepository, PasswordEncoder passwordEncoder) {
+      UserRepository userRepository, PasswordEncoder passwordEncoder,
+      LoginAttemptService loginAttemptService) {
     this.userService = userService;
     this.authenticationManager = authenticationManager;
     this.jwtUtils = jwtUtils;
     this.passwordResetService = passwordResetService;
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
+    this.loginAttemptService = loginAttemptService;
   }
 
   /**
@@ -65,29 +72,36 @@ public class AuthController {
    */
   @PostMapping("/login")
   public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
+    String email = loginRequest.getUsername().toLowerCase().trim();
 
-    // This is NOT the JWT token - it's Spring Security's authentication object
-    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-        loginRequest.getUsername(), loginRequest.getPassword());
+    try {
+      UsernamePasswordAuthenticationToken authToken =
+          new UsernamePasswordAuthenticationToken(email, loginRequest.getPassword());
 
-    // AuthenticationManager will:
-    // - Call CustomUserDetailsService.loadUserByUsername(email)
-    // - Load User from database
-    // - Compare the provided password with the stored BCrypt hash
-    // - If valid: return Authentication object with UserDetails
-    // - If invalid: throw BadCredentialsException (Spring handles this → 401)
-    Authentication authentication = authenticationManager.authenticate(authToken);
+      Authentication authentication = authenticationManager.authenticate(authToken);
+      SecurityContextHolder.getContext().setAuthentication(authentication);
 
-    // This makes the user "logged in" for this request
-    // (Not really necessary for login endpoint, but good practice)
-    SecurityContextHolder.getContext().setAuthentication(authentication);
+      // Reset failed attempts on successful login
+      loginAttemptService.loginSucceeded(email);
 
-    String jwt = jwtUtils.generateToken(authentication);
-    User userDetails = (User) authentication.getPrincipal();
+      String jwt = jwtUtils.generateToken(authentication);
+      User userDetails = (User) authentication.getPrincipal();
+      return ResponseEntity.ok(new JwtResponse(jwt, userDetails.getEmail(), userDetails.getName()));
 
-    JwtResponse response = new JwtResponse(jwt, userDetails.getEmail(), userDetails.getName());
+    } catch (LockedException e) {
+      String lockMsg = loginAttemptService.getLockMessage(email);
+      return ResponseEntity.status(HttpStatus.LOCKED)
+          .body(lockMsg != null ? lockMsg : "Account is temporarily locked. Please try again later.");
 
-    return ResponseEntity.ok(response);
+    } catch (BadCredentialsException e) {
+      // Increment counter — lock after 5 attempts
+      loginAttemptService.loginFailed(email);
+      String lockMsg = loginAttemptService.getLockMessage(email);
+      if (lockMsg != null) {
+        return ResponseEntity.status(HttpStatus.LOCKED).body(lockMsg);
+      }
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid email or password.");
+    }
   }
 
   /**

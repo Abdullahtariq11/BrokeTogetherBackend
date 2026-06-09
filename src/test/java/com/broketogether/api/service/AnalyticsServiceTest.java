@@ -75,6 +75,7 @@ public class AnalyticsServiceTest {
 
             Expense e1 = buildExpense(1L, "Rent", new BigDecimal("800.00"), "Rent", premiumUser);
             Expense e2 = buildExpense(2L, "Groceries run", new BigDecimal("120.00"), "Groceries", premiumUser);
+            // e3 is paid by freeUser — should NOT appear in premiumUser's category breakdown
             Expense e3 = buildExpense(3L, "More groceries", new BigDecimal("80.00"), "Groceries", freeUser);
 
             when(expenseRepository.findByHomeId(1L)).thenReturn(List.of(e1, e2, e3));
@@ -83,7 +84,8 @@ public class AnalyticsServiceTest {
 
             assertNotNull(response);
             assertEquals(new BigDecimal("800.00"), response.spendingByCategory().get("Rent"));
-            assertEquals(new BigDecimal("200.00"), response.spendingByCategory().get("Groceries"));
+            // Only premiumUser's groceries (120.00), not freeUser's (80.00)
+            assertEquals(new BigDecimal("120.00"), response.spendingByCategory().get("Groceries"));
         }
 
         @Test

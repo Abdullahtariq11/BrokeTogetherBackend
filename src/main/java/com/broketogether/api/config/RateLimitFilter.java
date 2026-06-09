@@ -19,18 +19,19 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Rate limiting filter using Bucket4j.
- * Limits requests per IP address to prevent abuse.
+ * - Global: 300 requests/min per IP (covers normal dashboard usage)
+ * - Auth endpoints: 10 requests/min per IP (brute-force protection)
  */
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
-  // Store a bucket per IP address
-  private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+  // Global buckets — one per IP
+  private final Map<String, Bucket> globalBuckets = new ConcurrentHashMap<>();
 
-  private Bucket createNewBucket() {
-    // 300 requests per minute per IP (5 req/sec burst tolerance)
-    // React StrictMode double-invokes effects in dev, and a dashboard load
-    // fires several parallel requests — 30/min was far too restrictive.
+  // Strict buckets for sensitive auth endpoints — one per IP
+  private final Map<String, Bucket> authBuckets = new ConcurrentHashMap<>();
+
+  private Bucket createGlobalBucket() {
     Bandwidth limit = Bandwidth.builder()
         .capacity(300)
         .refillGreedy(300, Duration.ofMinutes(1))
@@ -38,8 +39,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
     return Bucket.builder().addLimit(limit).build();
   }
 
-  private Bucket resolveBucket(String ip) {
-    return buckets.computeIfAbsent(ip, k -> createNewBucket());
+  private Bucket createAuthBucket() {
+    // 10 attempts per minute per IP on auth endpoints
+    Bandwidth limit = Bandwidth.builder()
+        .capacity(10)
+        .refillGreedy(10, Duration.ofMinutes(1))
+        .build();
+    return Bucket.builder().addLimit(limit).build();
+  }
+
+  private boolean isSensitiveAuthEndpoint(String path) {
+    return path.equals("/api/v1/auth/login")
+        || path.equals("/api/v1/auth/register")
+        || path.equals("/api/v1/auth/forgot-password")
+        || path.equals("/api/v1/auth/reset-password");
   }
 
   @Override
@@ -47,23 +60,37 @@ public class RateLimitFilter extends OncePerRequestFilter {
       FilterChain filterChain) throws ServletException, IOException {
 
     String ip = getClientIp(request);
-    Bucket bucket = resolveBucket(ip);
+    String path = request.getRequestURI();
 
-    if (bucket.tryConsume(1)) {
-      filterChain.doFilter(request, response);
-    } else {
-      response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-      response.setContentType("application/json");
-      response.getWriter().write(
-          "{\"status\":429,\"message\":\"Too many requests. Please try again later.\",\"timestamp\":"
-              + System.currentTimeMillis() + "}");
+    // Apply stricter limit to auth endpoints first
+    if (isSensitiveAuthEndpoint(path)) {
+      Bucket authBucket = authBuckets.computeIfAbsent(ip, k -> createAuthBucket());
+      if (!authBucket.tryConsume(1)) {
+        writeTooManyRequests(response, "Too many attempts. Please wait a minute and try again.");
+        return;
+      }
     }
+
+    // Apply global limit to all endpoints
+    Bucket globalBucket = globalBuckets.computeIfAbsent(ip, k -> createGlobalBucket());
+    if (!globalBucket.tryConsume(1)) {
+      writeTooManyRequests(response, "Too many requests. Please try again later.");
+      return;
+    }
+
+    filterChain.doFilter(request, response);
+  }
+
+  private void writeTooManyRequests(HttpServletResponse response, String message) throws IOException {
+    response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+    response.setContentType("application/json");
+    response.getWriter().write(
+        "{\"status\":429,\"message\":\"" + message + "\",\"timestamp\":" + System.currentTimeMillis() + "}");
   }
 
   private String getClientIp(HttpServletRequest request) {
     // With server.forward-headers-strategy=native, Spring has already resolved
     // the real client IP from X-Forwarded-For into getRemoteAddr().
-    // Reading the raw header directly would allow spoofing to bypass rate limiting.
     return request.getRemoteAddr();
   }
 }
