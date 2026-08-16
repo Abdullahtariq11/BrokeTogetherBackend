@@ -46,7 +46,11 @@ public class BillingController {
         return ResponseEntity.ok("received");
     }
 
-
-
-
+    @PostMapping("/revenuecat/webhook")
+    public ResponseEntity<String> revenueCatWebhook(
+            @RequestBody String payload,
+            @RequestHeader("Authorization") String authHeader) {
+        billingService.handleRevenueCatWebhook(payload, authHeader);
+        return ResponseEntity.ok("received");
+    }
 }

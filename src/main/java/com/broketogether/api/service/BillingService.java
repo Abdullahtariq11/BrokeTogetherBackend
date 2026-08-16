@@ -5,6 +5,8 @@ import com.broketogether.api.model.SubscriptionStatus;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.UserRepository;
 import com.broketogether.api.utility.Utility;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stripe.Stripe;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
@@ -13,6 +15,8 @@ import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,6 +27,9 @@ import java.util.Optional;
 
 @Service
 public class BillingService extends Utility {
+
+    private static final Logger log = LoggerFactory.getLogger(BillingService.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final UserRepository userRepository;
 
@@ -41,6 +48,9 @@ public class BillingService extends Utility {
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
+
+    @Value("${revenuecat.webhook-secret}")
+    private String revenueCatWebhookSecret;
 
     @PostConstruct
     public void init() {
@@ -163,6 +173,68 @@ public class BillingService extends Utility {
                     userRepository.save(user);
                 });
             }
+        }
+    }
+
+    // ── RevenueCat ────────────────────────────────────────────────────────────
+
+    public void handleRevenueCatWebhook(String payload, String authHeader) {
+        // Verify the shared secret RevenueCat sends in the Authorization header
+        if (!revenueCatWebhookSecret.equals(authHeader)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid RevenueCat webhook secret");
+        }
+
+        try {
+            JsonNode root       = objectMapper.readTree(payload);
+            JsonNode event      = root.path("event");
+            String   eventType  = event.path("type").asText();
+            String   appUserId  = event.path("app_user_id").asText();
+
+            if (appUserId.isBlank()) {
+                log.warn("RevenueCat webhook missing app_user_id, event type={}", eventType);
+                return;
+            }
+
+            long userId;
+            try {
+                userId = Long.parseLong(appUserId);
+            } catch (NumberFormatException e) {
+                log.warn("RevenueCat app_user_id is not a numeric id: {}", appUserId);
+                return;
+            }
+
+            Optional<User> userOpt = userRepository.findById(userId);
+            if (userOpt.isEmpty()) {
+                log.warn("RevenueCat webhook: no user found for id={}", userId);
+                return;
+            }
+
+            User user = userOpt.get();
+
+            switch (eventType) {
+                case "INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "UNCANCELLATION" -> {
+                    user.setPremium(true);
+                    user.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+                    userRepository.save(user);
+                    log.info("RevenueCat: granted premium to user {} ({})", userId, eventType);
+                }
+                case "CANCELLATION", "EXPIRATION" -> {
+                    user.setPremium(false);
+                    user.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
+                    userRepository.save(user);
+                    log.info("RevenueCat: revoked premium for user {} ({})", userId, eventType);
+                }
+                case "BILLING_ISSUE" -> {
+                    user.setSubscriptionStatus(SubscriptionStatus.PAST_DUE);
+                    userRepository.save(user);
+                    log.info("RevenueCat: billing issue for user {} ({})", userId, eventType);
+                }
+                default -> log.debug("RevenueCat: unhandled event type={} for user={}", eventType, userId);
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to parse RevenueCat webhook payload", e);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid webhook payload");
         }
     }
 }
