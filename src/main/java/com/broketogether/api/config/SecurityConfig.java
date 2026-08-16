@@ -191,7 +191,7 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
             "/swagger-ui.html")
         .permitAll()
-        .requestMatchers("/api/v1/billing/webhook").permitAll()
+        .requestMatchers("/api/v1/billing/webhook", "/api/v1/billing/revenuecat/webhook").permitAll()
         .requestMatchers("/privacy-policy.html", "/terms-and-conditions.html", "/delete-account.html").permitAll()
         .requestMatchers("/actuator/health").permitAll()
         .requestMatchers("/actuator/**").denyAll()
