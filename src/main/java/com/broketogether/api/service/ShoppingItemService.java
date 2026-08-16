@@ -1,9 +1,12 @@
 package com.broketogether.api.service;
 
+import com.broketogether.api.dto.ConvertExpenseRequest;
 import com.broketogether.api.dto.ExpenseRequest;
+import com.broketogether.api.dto.ExpenseRequestUpdated;
 import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ItemRequest;
 import com.broketogether.api.dto.ItemResponse;
+import com.broketogether.api.dto.enums.SplitType;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.ShoppingItem;
 import com.broketogether.api.model.User;
@@ -194,14 +197,14 @@ public class ShoppingItemService extends Utility {
      * @return ExpenseResponse
      */
     @Transactional
-    public ExpenseResponse convertToExpense(Long itemId, boolean split) throws AccountNotFoundException {
+    public ExpenseResponse convertToExpense(Long itemId, ConvertExpenseRequest convertRequest) throws AccountNotFoundException {
         ShoppingItem shoppingItem = shoppingItemRepository
                 .findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("No shopping Item found with this id."));
         User userDetails = getUserDetails();
         checkUserMemberOfHome(shoppingItem.getHome(), userDetails);
 
-        if(shoppingItem.getConvertedToExpense()){
+        if (shoppingItem.getConvertedToExpense()) {
             throw new ConflictException("Item already converted to expense.");
         }
         if (!shoppingItem.getChecked()) {
@@ -214,18 +217,18 @@ public class ShoppingItemService extends Utility {
         shoppingItem.setConvertedToExpense(true);
         shoppingItemRepository.save(shoppingItem);
 
-        if (split) {
-            ExpenseRequest request = new ExpenseRequest(
-                    shoppingItem.getPrice(),
-                    shoppingItem.getName(),
-                    "SHOPPING",
-                    shoppingItem.getHome().getId());
-            return expenseService.createExpense(request);
-        } else {
-            return expenseService.createPersonalExpense(
-                    shoppingItem.getPrice(),
-                    shoppingItem.getName(),
-                    shoppingItem.getHome().getId());
-        }
+        SplitType splitType = convertRequest.getSplitType() != null ? convertRequest.getSplitType() : SplitType.EQUAL;
+
+        ExpenseRequestUpdated req = new ExpenseRequestUpdated(
+                shoppingItem.getPrice(),
+                shoppingItem.getName(),
+                "SHOPPING",
+                convertRequest.getUserIds(),
+                convertRequest.getExactSplits(),
+                splitType,
+                convertRequest.getPayerFixedAmount()
+        );
+        req.setHomeId(shoppingItem.getHome().getId());
+        return expenseService.createExpenseUpdated(req);
     }
 }

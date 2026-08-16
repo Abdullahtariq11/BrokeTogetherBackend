@@ -1,5 +1,6 @@
 package com.broketogether.api.controller;
 
+import com.broketogether.api.dto.ConvertExpenseRequest;
 import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ItemRequest;
 import com.broketogether.api.dto.ItemResponse;
@@ -51,7 +52,7 @@ public class ShoppingItemController {
     @PostMapping("/item/{itemId}/convert")
     public ResponseEntity<ExpenseResponse> convert(
             @PathVariable Long itemId,
-            @RequestParam boolean split) throws AccountNotFoundException {
-        return ResponseEntity.status(201).body(itemService.convertToExpense(itemId, split));
+            @Valid @RequestBody ConvertExpenseRequest request) throws AccountNotFoundException {
+        return ResponseEntity.status(201).body(itemService.convertToExpense(itemId, request));
     }
 }
