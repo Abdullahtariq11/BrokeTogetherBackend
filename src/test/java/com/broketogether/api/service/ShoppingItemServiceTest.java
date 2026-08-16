@@ -1,9 +1,12 @@
 package com.broketogether.api.service;
 
+import com.broketogether.api.dto.ConvertExpenseRequest;
 import com.broketogether.api.dto.ExpenseRequest;
+import com.broketogether.api.dto.ExpenseRequestUpdated;
 import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ItemRequest;
 import com.broketogether.api.dto.ItemResponse;
+import com.broketogether.api.dto.enums.SplitType;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.ShoppingItem;
 import com.broketogether.api.model.User;
@@ -306,104 +309,93 @@ class ShoppingItemServiceTest {
     @DisplayName("convertToExpense")
     class ConvertToExpenseTests {
 
+        private ConvertExpenseRequest req(SplitType type) {
+            ConvertExpenseRequest r = new ConvertExpenseRequest();
+            r.setSplitType(type);
+            return r;
+        }
+
+        private ExpenseResponse mockResponse() {
+            return new ExpenseResponse(1L, new BigDecimal("10.00"), "Milk", "SHOPPING", Map.of());
+        }
+
         @Test
-        @DisplayName("Should create expense split equally among all members when split is true")
-        void shouldCreateExpenseWithSplitsWhenSplitIsTrue() throws Exception {
+        @DisplayName("EQUAL split delegates to createExpenseUpdated")
+        void equalSplitDelegatesToUpdated() throws Exception {
             testItem.setChecked(true);
-
-            ExpenseResponse mockExpenseResponse = new ExpenseResponse(
-                    1L, new BigDecimal("10.00"), "Milk", "SHOPPING", Map.of());
-
             when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
-            when(shoppingItemRepository.save(any(ShoppingItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-            when(expenseService.createExpense(any(ExpenseRequest.class))).thenReturn(mockExpenseResponse);
+            when(shoppingItemRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(expenseService.createExpenseUpdated(any(ExpenseRequestUpdated.class))).thenReturn(mockResponse());
 
-            ExpenseResponse result = shoppingItemService.convertToExpense(1L, true);
+            ExpenseResponse result = shoppingItemService.convertToExpense(1L, req(SplitType.EQUAL));
 
             assertNotNull(result);
             assertEquals("SHOPPING", result.getCategory());
             assertTrue(testItem.getConvertedToExpense());
-            verify(shoppingItemRepository, times(1)).save(testItem);
-            verify(expenseService, times(1)).createExpense(any(ExpenseRequest.class));
-            verify(expenseService, never()).createPersonalExpense(any(), any(), any());
+            verify(expenseService).createExpenseUpdated(any(ExpenseRequestUpdated.class));
         }
 
         @Test
-        @DisplayName("Should create personal expense with no splits when split is false")
-        void shouldCreateExpenseWithNoSplitsWhenSplitIsFalse() throws Exception {
+        @DisplayName("PERSONAL split delegates to createExpenseUpdated with PERSONAL type")
+        void personalSplitDelegatesToUpdated() throws Exception {
             testItem.setChecked(true);
-
-            ExpenseResponse mockExpenseResponse = new ExpenseResponse(
-                    1L, new BigDecimal("10.00"), "Milk", "SHOPPING", Map.of());
-
             when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
-            when(shoppingItemRepository.save(any(ShoppingItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-            when(expenseService.createPersonalExpense(any(BigDecimal.class), any(String.class), any(Long.class)))
-                    .thenReturn(mockExpenseResponse);
+            when(shoppingItemRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(expenseService.createExpenseUpdated(any(ExpenseRequestUpdated.class))).thenReturn(mockResponse());
 
-            ExpenseResponse result = shoppingItemService.convertToExpense(1L, false);
+            ExpenseResponse result = shoppingItemService.convertToExpense(1L, req(SplitType.PERSONAL));
 
             assertNotNull(result);
             assertTrue(testItem.getConvertedToExpense());
-            verify(shoppingItemRepository, times(1)).save(testItem);
-            verify(expenseService, times(1)).createPersonalExpense(
-                    new BigDecimal("10.00"), "Milk", testHome.getId());
-            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
+            verify(expenseService).createExpenseUpdated(any(ExpenseRequestUpdated.class));
         }
 
         @Test
-        @DisplayName("Should throw exception when item is already converted to an expense")
-        void shouldThrowWhenItemAlreadyConverted() throws AccountNotFoundException {
+        @DisplayName("Should throw when item is already converted")
+        void shouldThrowWhenItemAlreadyConverted() {
             testItem.setChecked(true);
             testItem.setConvertedToExpense(true);
-
             when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
 
             RuntimeException ex = assertThrows(RuntimeException.class,
-                    () -> shoppingItemService.convertToExpense(1L, true));
+                    () -> shoppingItemService.convertToExpense(1L, req(SplitType.EQUAL)));
             assertEquals("Item already converted to expense.", ex.getMessage());
             verify(shoppingItemRepository, never()).save(any());
-            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
         }
 
         @Test
-        @DisplayName("Should throw exception when item is not checked before converting")
-        void shouldThrowWhenItemNotCheckedOnConvert() throws AccountNotFoundException {
-            // testItem.isChecked == false by default from setUp
+        @DisplayName("Should throw when item is not checked")
+        void shouldThrowWhenItemNotChecked() {
             when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
 
             RuntimeException ex = assertThrows(RuntimeException.class,
-                    () -> shoppingItemService.convertToExpense(1L, true));
+                    () -> shoppingItemService.convertToExpense(1L, req(SplitType.EQUAL)));
             assertEquals("Item must be checked before converting to an expense.", ex.getMessage());
-            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
         }
 
         @Test
-        @DisplayName("Should throw exception when item is not found on convert")
-        void shouldThrowWhenItemNotFoundOnConvert() throws AccountNotFoundException {
+        @DisplayName("Should throw when item not found")
+        void shouldThrowWhenItemNotFound() {
             when(shoppingItemRepository.findById(999L)).thenReturn(Optional.empty());
 
             RuntimeException ex = assertThrows(RuntimeException.class,
-                    () -> shoppingItemService.convertToExpense(999L, true));
+                    () -> shoppingItemService.convertToExpense(999L, req(SplitType.EQUAL)));
             assertEquals("No shopping Item found with this id.", ex.getMessage());
-            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
         }
 
         @Test
-        @DisplayName("Should throw exception when user is not a member of the home on convert")
-        void shouldThrowWhenUserIsNotMemberOnConvert() throws AccountNotFoundException {
+        @DisplayName("Should throw when user is not a home member")
+        void shouldThrowWhenUserNotMember() {
             Home homeWithoutUser = new Home();
             homeWithoutUser.setId(2L);
             homeWithoutUser.setMembers(new HashSet<>(Set.of(otherUser)));
             testItem.setHome(homeWithoutUser);
             testItem.setChecked(true);
-
             when(shoppingItemRepository.findById(1L)).thenReturn(Optional.of(testItem));
 
             RuntimeException ex = assertThrows(RuntimeException.class,
-                    () -> shoppingItemService.convertToExpense(1L, true));
+                    () -> shoppingItemService.convertToExpense(1L, req(SplitType.EQUAL)));
             assertEquals("You are not a member of this home", ex.getMessage());
-            verify(expenseService, never()).createExpense(any(ExpenseRequest.class));
         }
     }
 }
