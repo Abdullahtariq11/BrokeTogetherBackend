@@ -23,8 +23,7 @@ public class UserController {
 
   /**
    * Get the current authenticated user's profile.
-   *
-   * @param currentUser The authenticated user (automatically injected by Spring)
+   * The authenticated user (automatically injected by Spring)
    * @return UserResponse with the current user's profile
    */
   @GetMapping("/me")

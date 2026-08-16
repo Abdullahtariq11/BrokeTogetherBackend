@@ -13,9 +13,12 @@ import java.util.stream.Collectors;
 import javax.security.auth.login.AccountNotFoundException;
 
 import com.broketogether.api.dto.*;
+import com.broketogether.api.dto.enums.SplitType;
 import com.broketogether.api.exception.ForbiddenException;
 import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.utility.Utility;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +56,7 @@ public class ExpenseService extends Utility {
   @Transactional
   public ExpenseResponse createExpense(ExpenseRequest expenseRequest)
       throws AccountNotFoundException {
+
     User userDetails = getUserDetails();
     Home home = homeRepository.findById(expenseRequest.getHomeId())
         .orElseThrow(() -> new ResourceNotFoundException("Home with this id does not exist."));
@@ -91,8 +95,10 @@ public class ExpenseService extends Utility {
           new ExpenseSplitResponse(split.getId(), split.getAmount()));
     }
 
-    return new ExpenseResponse(expenseCreated.getId(), expenseCreated.getAmount(),
+    ExpenseResponse res1 = new ExpenseResponse(expenseCreated.getId(), expenseCreated.getAmount(),
         expenseCreated.getDescription(), expenseCreated.getCategory(), splitResponses);
+    res1.setCreatedAt(expenseCreated.getCreatedAt());
+    return res1;
 
   }
 
@@ -162,10 +168,176 @@ public class ExpenseService extends Utility {
           new ExpenseSplitResponse(split.getId(), split.getAmount()));
     }
 
-    return new ExpenseResponse(expenseCreated.getId(), expenseCreated.getAmount(),
+    ExpenseResponse res2 = new ExpenseResponse(expenseCreated.getId(), expenseCreated.getAmount(),
         expenseCreated.getDescription(), expenseCreated.getCategory(), splitResponses);
+    res2.setCreatedAt(expenseCreated.getCreatedAt());
+    return res2;
   }
 
+  /**
+   * Creates Expense for user with equal splits among users
+   * @param expenseRequest expense dto used to create expense.
+   *
+   * @return ExpenseResponse
+   * @throws AccountNotFoundException if there is no account
+   */
+  @Transactional
+  public ExpenseResponse createExpenseUpdated(ExpenseRequestUpdated expenseRequest)
+          throws AccountNotFoundException {
+    User userDetails = getUserDetails();
+    Home home = homeRepository.findById(expenseRequest.getHomeId())
+            .orElseThrow(() -> new ResourceNotFoundException("Home with this id does not exist."));
+    checkUserMemberOfHome(home, userDetails);
+
+    Expense expense = new Expense();
+    expense.setAmount(expenseRequest.getTotalAmount());
+    expense.setCategory(expenseRequest.getCategory());
+    expense.setDescription(expenseRequest.getDescription());
+    expense.setHome(home);
+    expense.setPayer(userDetails);
+
+    Set<User> participants;
+    if (expenseRequest.getSplitType() == SplitType.PERSONAL) {
+      // Personal: only the payer, no splits with others
+      participants = Set.of(userDetails);
+    } else {
+      Set<Long> userIds = expenseRequest.getUserIds();
+      if (userIds == null || userIds.isEmpty()) {
+        // Default: all home members
+        participants = home.getMembers();
+      } else {
+        List<User> selected = userRepository.findAllById(userIds);
+        participants = new HashSet<>(selected);
+        participants.add(userDetails);
+        Set<Long> homeMemberIds = home.getMembers().stream()
+                .map(User::getId).collect(Collectors.toSet());
+        for (User m : participants) {
+          if (!homeMemberIds.contains(m.getId())) {
+            throw new ForbiddenException("User " + m.getId() + " is not a member of this home");
+          }
+        }
+      }
+      if (participants.isEmpty()) {
+        throw new IllegalArgumentException("No members in home");
+      }
+    }
+
+    List<ExpenseSplit> splits = getSplits(expense, userDetails, participants, expenseRequest);
+    expense.setSplits(splits);
+
+    Expense saved = expenseRepository.save(expense);
+
+    Map<Long, ExpenseSplitResponse> splitResponses = new HashMap<>();
+    for (ExpenseSplit split : saved.getSplits()) {
+      splitResponses.put(split.getUser().getId(),
+              new ExpenseSplitResponse(split.getId(), split.getAmount()));
+    }
+
+    ExpenseResponse response = new ExpenseResponse(saved.getId(), saved.getAmount(),
+            saved.getDescription(), saved.getCategory(), splitResponses);
+    response.setPayerId(userDetails.getId());
+    response.setPayerName(userDetails.getName());
+    response.setCreatedAt(saved.getCreatedAt());
+    return response;
+  }
+
+  private List<ExpenseSplit>getSplits(Expense expense,
+                                                      User payer,Set<User> participants,
+                                                      ExpenseRequestUpdated expenseRequest){
+
+    BigDecimal total = expenseRequest.getTotalAmount();
+    List<ExpenseSplit> expenseSplits = new ArrayList<>();
+
+    switch (expenseRequest.getSplitType()) {
+      case PERSONAL -> {
+        // Only records the payer's expense — no splits with other members
+        expenseSplits.add(new ExpenseSplit(expense, payer, total));
+        break;
+      }
+      case EQUAL -> {
+        BigDecimal share = total.divide(BigDecimal.valueOf(participants.size()), 2, RoundingMode.HALF_UP);
+        for (User member : participants) {
+          expenseSplits.add(new ExpenseSplit(expense, member, share));
+        }
+        break;
+      }
+      case FIXED -> {
+        BigDecimal payerAmount = expenseRequest.getPayerFixedAmount();
+        if (payerAmount == null || payerAmount.compareTo(BigDecimal.ZERO) < 0 || payerAmount.compareTo(total) > 0) {
+          throw new IllegalArgumentException("Invalid payer fixed amount.");
+        }
+
+        Set<User> otherMembers = participants.stream()
+                .filter(u -> !u.getId().equals(payer.getId()))
+                .collect(Collectors.toSet());
+
+        if (otherMembers.isEmpty()) {
+          throw new IllegalArgumentException("Need other participants to split the remainder.");
+        }
+
+        BigDecimal remaining = total.subtract(payerAmount);
+        BigDecimal shareForOthers = remaining.divide(
+                BigDecimal.valueOf(otherMembers.size()), 2, RoundingMode.HALF_UP
+        );
+
+        expenseSplits.add(new ExpenseSplit(expense, payer, payerAmount));
+        for (User other : otherMembers) {
+          expenseSplits.add(new ExpenseSplit(expense, other, shareForOthers));
+        }
+        break;
+      }
+      case CUSTOM -> {
+        Map<Long, BigDecimal> exactMap = expenseRequest.getExactSplits();
+        if (exactMap == null || exactMap.isEmpty()) {
+          throw new IllegalArgumentException("Exact split breakdown is required.");
+        }
+
+        BigDecimal sum = exactMap.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (sum.compareTo(total) != 0) {
+          throw new IllegalArgumentException("Split amounts sum (" + sum + ") must equal total expense (" + total + ").");
+        }
+
+        for (User member : participants) {
+          BigDecimal memberShare = exactMap.getOrDefault(member.getId(), BigDecimal.ZERO);
+          expenseSplits.add(new ExpenseSplit(expense, member, memberShare));
+        }
+        break;
+      }
+    }
+
+    return expenseSplits;
+  }
+
+
+  private List<User> getParticipants(Set<Long> userIds, User userDetails, Home home) {
+    if (userIds.isEmpty()) {
+      return null;
+    }
+    List<User> selectedMembers = userRepository.findAllById(userIds);
+
+    Set<User> expenseMembers = new HashSet<>(selectedMembers);
+    expenseMembers.add(userDetails);
+
+    Set<Long> homeMemberIds = home.getMembers().stream()
+            .map(User::getId)
+            .collect(Collectors.toSet());
+
+    for (User member : expenseMembers) {
+      if (!homeMemberIds.contains(member.getId())) {
+        throw new ForbiddenException("User " + member.getId() + " is not a member of this home");
+      }
+    }
+      return selectedMembers;
+  }
+
+
+    /**
+     * Method is responsible for returning all expenses for a home
+     * @param homeId home id
+     * @param page page number
+     * @param size size of expenses to display
+     * @return  all expenses for a home
+     * */
   @Transactional(readOnly = true)
   public PagedExpenseResponse getAllExpensesForHome(Long homeId, int page, int size)
       throws AccountNotFoundException {
@@ -175,9 +347,9 @@ public class ExpenseService extends Utility {
 
     checkUserMemberOfHome(home, userDetails);
 
-    org.springframework.data.domain.Page<Expense> expensePage =
+    Page<Expense> expensePage =
         expenseRepository.findByHomeIdOrderByIdDesc(
-            homeId, org.springframework.data.domain.PageRequest.of(page, size));
+            homeId, PageRequest.of(page, size));
 
     List<ExpenseResponse> expenseResponses = new ArrayList<>();
     for (Expense expense : expensePage.getContent()) {
@@ -192,6 +364,7 @@ public class ExpenseService extends Utility {
         response.setPayerId(expense.getPayer().getId());
         response.setPayerName(expense.getPayer().getName());
       }
+      response.setCreatedAt(expense.getCreatedAt());
       expenseResponses.add(response);
     }
 
@@ -218,8 +391,10 @@ public class ExpenseService extends Utility {
         .collect(Collectors.toMap(split -> split.getUser().getId(),
             split -> new ExpenseSplitResponse(split.getId(), split.getAmount())));
 
-    return new ExpenseResponse(expense.getId(), expense.getAmount(), expense.getDescription(),
+    ExpenseResponse res3 = new ExpenseResponse(expense.getId(), expense.getAmount(), expense.getDescription(),
         expense.getCategory(), splitResponses);
+    res3.setCreatedAt(expense.getCreatedAt());
+    return res3;
   }
 
   /**
@@ -319,8 +494,10 @@ public class ExpenseService extends Utility {
 
     Expense saved = expenseRepository.save(expense);
 
-    return new ExpenseResponse(saved.getId(), saved.getAmount(),
+    ExpenseResponse res4 = new ExpenseResponse(saved.getId(), saved.getAmount(),
         saved.getDescription(), saved.getCategory(), Map.of());
+    res4.setCreatedAt(saved.getCreatedAt());
+    return res4;
   }
 
   /**
@@ -362,8 +539,10 @@ public class ExpenseService extends Utility {
         payee.getId(), new ExpenseSplitResponse(saved.getSplits().get(0).getId(), amount)
         );
 
-    return new ExpenseResponse(saved.getId(), saved.getAmount(),
+    ExpenseResponse res5 = new ExpenseResponse(saved.getId(), saved.getAmount(),
         saved.getDescription(), saved.getCategory(), splitResponses);
+    res5.setCreatedAt(saved.getCreatedAt());
+    return res5;
   }
 
   @Transactional(readOnly = true)
@@ -410,8 +589,6 @@ public class ExpenseService extends Utility {
 
     return suggestions;
   }
-
-
 
 
 }
