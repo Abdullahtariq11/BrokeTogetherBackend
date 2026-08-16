@@ -23,8 +23,10 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.broketogether.api.dto.ExpenseRequest;
+import com.broketogether.api.dto.ExpenseRequestUpdated;
 import com.broketogether.api.dto.ExpenseResponse;
 import com.broketogether.api.dto.ExpenseWithUserRequest;
+import com.broketogether.api.dto.enums.SplitType;
 import com.broketogether.api.model.Expense;
 import com.broketogether.api.model.ExpenseSplit;
 import com.broketogether.api.model.Home;
@@ -225,6 +227,162 @@ public class ExpenseServiceTest {
       RuntimeException exception = assertThrows(RuntimeException.class,
           () -> expenseService.createExpense(request));
       assertTrue(exception.getMessage().contains("is not a member of this home"));
+    }
+  }
+
+  // ==================== createExpenseUpdated (SplitType) Tests ====================
+
+  @Nested
+  @DisplayName("createExpenseUpdated with split types")
+  class CreateExpenseUpdatedTests {
+
+    private ExpenseRequestUpdated buildRequest(SplitType splitType, Set<Long> userIds,
+        Map<Long, BigDecimal> exactSplits, BigDecimal payerFixed) {
+      ExpenseRequestUpdated req = new ExpenseRequestUpdated(
+          new BigDecimal("120.00"), "Test expense", "FOOD",
+          userIds, exactSplits, splitType, payerFixed);
+      req.setHomeId(1L);
+      return req;
+    }
+
+    private void stubSave() {
+      when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> {
+        Expense e = inv.getArgument(0);
+        e.setId(10L);
+        long sid = 100L;
+        for (ExpenseSplit s : e.getSplits()) s.setId(sid++);
+        return e;
+      });
+    }
+
+    @Test
+    @DisplayName("EQUAL split with explicit userIds divides evenly")
+    void equalSplitWithUserIds() throws AccountNotFoundException {
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(userRepository.findAllById(Set.of(2L))).thenReturn(List.of(otherUser));
+      stubSave();
+
+      ExpenseResponse response = expenseService.createExpenseUpdated(
+          buildRequest(SplitType.EQUAL, Set.of(2L), null, null));
+
+      assertEquals(2, response.getSplits().size());
+      response.getSplits().values().forEach(s ->
+          assertEquals(new BigDecimal("60.00"), s.getAmount()));
+    }
+
+    @Test
+    @DisplayName("EQUAL split with no userIds defaults to all home members")
+    void equalSplitDefaultsToAllMembers() throws AccountNotFoundException {
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      stubSave();
+
+      ExpenseResponse response = expenseService.createExpenseUpdated(
+          buildRequest(SplitType.EQUAL, null, null, null));
+
+      assertEquals(2, response.getSplits().size());
+      response.getSplits().values().forEach(s ->
+          assertEquals(new BigDecimal("60.00"), s.getAmount()));
+    }
+
+    @Test
+    @DisplayName("PERSONAL split records full amount only for payer")
+    void personalSplitOnlyForPayer() throws AccountNotFoundException {
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      stubSave();
+
+      ExpenseResponse response = expenseService.createExpenseUpdated(
+          buildRequest(SplitType.PERSONAL, null, null, null));
+
+      assertEquals(1, response.getSplits().size());
+      BigDecimal splitAmount = response.getSplits().get(testUser.getId()).getAmount();
+      assertEquals(new BigDecimal("120.00"), splitAmount);
+    }
+
+    @Test
+    @DisplayName("FIXED split assigns payer's fixed amount and remainder to others")
+    void fixedSplitAssignsCorrectAmounts() throws AccountNotFoundException {
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(userRepository.findAllById(Set.of(2L))).thenReturn(List.of(otherUser));
+      stubSave();
+
+      // Payer pays 80, other pays 40
+      ExpenseResponse response = expenseService.createExpenseUpdated(
+          buildRequest(SplitType.FIXED, Set.of(2L), null, new BigDecimal("80.00")));
+
+      assertEquals(2, response.getSplits().size());
+      assertEquals(new BigDecimal("80.00"), response.getSplits().get(testUser.getId()).getAmount());
+      assertEquals(new BigDecimal("40.00"), response.getSplits().get(otherUser.getId()).getAmount());
+    }
+
+    @Test
+    @DisplayName("CUSTOM split uses exact per-user amounts")
+    void customSplitUsesExactAmounts() throws AccountNotFoundException {
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(userRepository.findAllById(Set.of(2L))).thenReturn(List.of(otherUser));
+      stubSave();
+
+      Map<Long, BigDecimal> exact = Map.of(
+          1L, new BigDecimal("70.00"),
+          2L, new BigDecimal("50.00"));
+
+      ExpenseResponse response = expenseService.createExpenseUpdated(
+          buildRequest(SplitType.CUSTOM, Set.of(2L), exact, null));
+
+      assertEquals(2, response.getSplits().size());
+      assertEquals(new BigDecimal("70.00"), response.getSplits().get(testUser.getId()).getAmount());
+      assertEquals(new BigDecimal("50.00"), response.getSplits().get(otherUser.getId()).getAmount());
+    }
+
+    @Test
+    @DisplayName("CUSTOM split throws when amounts do not sum to total")
+    void customSplitThrowsOnMismatch() {
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(userRepository.findAllById(Set.of(2L))).thenReturn(List.of(otherUser));
+
+      Map<Long, BigDecimal> badExact = Map.of(
+          1L, new BigDecimal("60.00"),
+          2L, new BigDecimal("50.00")); // sums to 110, not 120
+
+      IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+          () -> expenseService.createExpenseUpdated(
+              buildRequest(SplitType.CUSTOM, Set.of(2L), badExact, null)));
+      assertTrue(ex.getMessage().contains("must equal total"));
+    }
+
+    @Test
+    @DisplayName("FIXED split throws when payerFixedAmount exceeds total")
+    void fixedSplitThrowsWhenPayerAmountExceedsTotal() {
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(userRepository.findAllById(Set.of(2L))).thenReturn(List.of(otherUser));
+
+      IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+          () -> expenseService.createExpenseUpdated(
+              buildRequest(SplitType.FIXED, Set.of(2L), null, new BigDecimal("150.00"))));
+      assertTrue(ex.getMessage().contains("Invalid payer fixed amount"));
+    }
+
+    @Test
+    @DisplayName("Throws when selected user is not a home member")
+    void throwsWhenSelectedUserNotInHome() {
+      User outsider = new User("Out", "out@test.com", "pw");
+      outsider.setId(99L);
+
+      when(homeRepository.findById(1L)).thenReturn(Optional.of(testHome));
+      when(userRepository.findAllById(Set.of(99L))).thenReturn(List.of(outsider));
+
+      assertThrows(RuntimeException.class,
+          () -> expenseService.createExpenseUpdated(
+              buildRequest(SplitType.EQUAL, Set.of(99L), null, null)));
+    }
+
+    @Test
+    @DisplayName("Throws when home not found")
+    void throwsWhenHomeNotFound() {
+      when(homeRepository.findById(1L)).thenReturn(Optional.empty());
+
+      assertThrows(RuntimeException.class,
+          () -> expenseService.createExpenseUpdated(
+              buildRequest(SplitType.EQUAL, null, null, null)));
     }
   }
 

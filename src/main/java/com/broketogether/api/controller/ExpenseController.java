@@ -51,6 +51,12 @@ public class ExpenseController {
     return ResponseEntity.status(201).body(expenseService.createExpense(request));
   }
 
+  @PostMapping("/split")
+  public ResponseEntity<ExpenseResponse> createWithSplitType(
+      @Valid @RequestBody ExpenseRequestUpdated request) throws AccountNotFoundException {
+    return ResponseEntity.status(201).body(expenseService.createExpenseUpdated(request));
+  }
+
   @GetMapping("/home/{homeId}/balances")
   public ResponseEntity<Map<Long, BigDecimal>> getBalancesByHomeId(@PathVariable Long homeId)
       throws AccountNotFoundException {

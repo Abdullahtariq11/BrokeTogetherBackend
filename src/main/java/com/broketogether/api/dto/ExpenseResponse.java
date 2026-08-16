@@ -1,6 +1,7 @@
 package com.broketogether.api.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,6 +21,8 @@ public class ExpenseResponse {
   private Long payerId;
 
   private String payerName;
+
+  private LocalDateTime createdAt;
 
   Map<Long, ExpenseSplitResponse> splits = new HashMap<>();
 
@@ -118,6 +121,14 @@ public class ExpenseResponse {
   /**
    * @return the splits
    */
+  public LocalDateTime getCreatedAt() {
+    return createdAt;
+  }
+
+  public void setCreatedAt(LocalDateTime createdAt) {
+    this.createdAt = createdAt;
+  }
+
   public Map<Long, ExpenseSplitResponse> getSplits() {
     return splits;
   }
