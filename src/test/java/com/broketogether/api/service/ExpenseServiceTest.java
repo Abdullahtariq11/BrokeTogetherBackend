@@ -34,6 +34,7 @@ import com.broketogether.api.model.User;
 import com.broketogether.api.repository.ExpenseRepository;
 import com.broketogether.api.repository.ExpenseSplitRepository;
 import com.broketogether.api.repository.HomeRepository;
+import com.broketogether.api.repository.SettlementCheckpointRepository;
 import com.broketogether.api.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +51,9 @@ public class ExpenseServiceTest {
 
   @Mock
   private ExpenseSplitRepository expenseSplitRepository;
+
+  @Mock
+  private SettlementCheckpointRepository settlementCheckpointRepository;
 
   @Mock
   private SecurityContext securityContext;

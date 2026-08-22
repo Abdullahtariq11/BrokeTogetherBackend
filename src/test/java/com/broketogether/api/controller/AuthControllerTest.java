@@ -73,7 +73,7 @@ public class AuthControllerTest {
       when(authentication.getPrincipal()).thenReturn(testUser);
       when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
           .thenReturn(authentication);
-      when(jwtUtils.generateToken(authentication)).thenReturn("mock-jwt-token");
+      when(jwtUtils.generateToken(eq(authentication), anyBoolean())).thenReturn("mock-jwt-token");
 
       mockMvc.perform(post("/api/v1/auth/login")
               .contentType(MediaType.APPLICATION_JSON)

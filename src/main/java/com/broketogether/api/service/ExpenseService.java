@@ -2,6 +2,7 @@ package com.broketogether.api.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,9 +27,11 @@ import org.springframework.transaction.annotation.Transactional;
 import com.broketogether.api.model.Expense;
 import com.broketogether.api.model.ExpenseSplit;
 import com.broketogether.api.model.Home;
+import com.broketogether.api.model.SettlementCheckpoint;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.ExpenseRepository;
 import com.broketogether.api.repository.HomeRepository;
+import com.broketogether.api.repository.SettlementCheckpointRepository;
 import com.broketogether.api.repository.UserRepository;
 
 @Service
@@ -37,13 +40,15 @@ public class ExpenseService extends Utility {
   private final ExpenseRepository expenseRepository;
   private final UserRepository userRepository;
   private final HomeRepository homeRepository;
+  private final SettlementCheckpointRepository settlementCheckpointRepository;
 
 
   public ExpenseService(ExpenseRepository expenseRepository, UserRepository userRepository,
-      HomeRepository homeRepository) {
+      HomeRepository homeRepository, SettlementCheckpointRepository settlementCheckpointRepository) {
     this.expenseRepository = expenseRepository;
     this.userRepository = userRepository;
     this.homeRepository = homeRepository;
+    this.settlementCheckpointRepository = settlementCheckpointRepository;
   }
 
   /**
@@ -368,7 +373,12 @@ public class ExpenseService extends Utility {
       expenseResponses.add(response);
     }
 
-    return new PagedExpenseResponse(expenseResponses, !expensePage.isLast(), page);
+    LocalDateTime lastSettledAt = settlementCheckpointRepository
+        .findByUserIdAndHomeId(userDetails.getId(), homeId)
+        .map(SettlementCheckpoint::getSettledAt)
+        .orElse(null);
+
+    return new PagedExpenseResponse(expenseResponses, !expensePage.isLast(), page, lastSettledAt);
   }
 
   /**
@@ -533,6 +543,15 @@ public class ExpenseService extends Utility {
     settlement.setSplits(List.of(split));
 
     Expense saved = expenseRepository.save(settlement);
+
+    // Mark this as the payer's settle-up checkpoint so the activity feed can
+    // show everything before it as closed out.
+    LocalDateTime now = LocalDateTime.now();
+    SettlementCheckpoint checkpoint = settlementCheckpointRepository
+        .findByUserIdAndHomeId(payer.getId(), homeId)
+        .orElseGet(() -> new SettlementCheckpoint(payer, home, now));
+    checkpoint.setSettledAt(now);
+    settlementCheckpointRepository.save(checkpoint);
 
     // Return response
     Map<Long, ExpenseSplitResponse> splitResponses = Map.of(

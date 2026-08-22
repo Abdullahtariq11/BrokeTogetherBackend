@@ -201,7 +201,7 @@ public class ExpenseControllerTest {
           createMockResponse(1L, new BigDecimal("100.00"), "GROCERIES"),
           createMockResponse(2L, new BigDecimal("50.00"), "UTILITIES"));
       when(expenseService.getAllExpensesForHome(1L, 0, 20))
-          .thenReturn(new PagedExpenseResponse(responses, false, 0));
+          .thenReturn(new PagedExpenseResponse(responses, false, 0, null));
 
       mockMvc.perform(get("/api/v1/expenses/home/1/history"))
           .andExpect(status().isOk())
@@ -213,7 +213,7 @@ public class ExpenseControllerTest {
     @DisplayName("Should return empty list when no expenses")
     void shouldReturnEmptyListWhenNoExpenses() throws Exception {
       when(expenseService.getAllExpensesForHome(1L, 0, 20))
-          .thenReturn(new PagedExpenseResponse(Collections.emptyList(), false, 0));
+          .thenReturn(new PagedExpenseResponse(Collections.emptyList(), false, 0, null));
 
       mockMvc.perform(get("/api/v1/expenses/home/1/history"))
           .andExpect(status().isOk())

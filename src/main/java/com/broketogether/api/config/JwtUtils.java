@@ -52,15 +52,23 @@ public class JwtUtils {
   private String jwtSecret;
 
   /**
-   * Token expiration time in milliseconds. Injected from application.properties.
-   * Default: 86400000 ms = 24 hours.
+   * Token expiration time in milliseconds for web/default clients. Injected from
+   * application.properties. Default: 86400000 ms = 24 hours.
    *
    * <p>
    * After this time, the token becomes invalid and the user must log in again.
    * </p>
    */
   @Value("${jwt.expiration}")
-  private int jwtExpirationMs;
+  private long jwtExpirationMs;
+
+  /**
+   * Token expiration time in milliseconds for the mobile app, which stays signed
+   * in across app restarts instead of expiring daily like the web client.
+   * Default: 2592000000 ms = 30 days.
+   */
+  @Value("${jwt.mobile-expiration}")
+  private long mobileJwtExpirationMs;
 
   /**
    * Generates a cryptographically secure signing key from the configured secret
@@ -114,22 +122,40 @@ public class JwtUtils {
    * @return A compact, URL-safe JWT token string
    */
   public String generateToken(Authentication authentication) {
-    UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+    return generateToken(authentication, false);
+  }
 
-    return Jwts.builder().setSubject(userPrincipal.getUsername())
-        .setIssuedAt(new Date())
-        .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
-        .signWith(getSigningKey())
-        .compact();
+  /**
+   * @param longLived when true, issues a mobile-length token (see
+   *                  {@link #mobileJwtExpirationMs}) instead of the default
+   *                  web-length token.
+   */
+  public String generateToken(Authentication authentication, boolean longLived) {
+    UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+    return buildToken(userPrincipal.getUsername(), longLived);
   }
 
   public String generateToken(UserDetails userDetails) {
+    return generateToken(userDetails, false);
+  }
+
+  /**
+   * @param longLived when true, issues a mobile-length token (see
+   *                  {@link #mobileJwtExpirationMs}) instead of the default
+   *                  web-length token.
+   */
+  public String generateToken(UserDetails userDetails, boolean longLived) {
+    return buildToken(userDetails.getUsername(), longLived);
+  }
+
+  private String buildToken(String subject, boolean longLived) {
+    long expirationMs = longLived ? mobileJwtExpirationMs : jwtExpirationMs;
     return Jwts.builder()
-            .setSubject(userDetails.getUsername())
-            .setIssuedAt(new Date())
-            .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-            .signWith(getSigningKey())
-            .compact();
+        .setSubject(subject)
+        .setIssuedAt(new Date())
+        .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
+        .signWith(getSigningKey())
+        .compact();
   }
 
   /**
