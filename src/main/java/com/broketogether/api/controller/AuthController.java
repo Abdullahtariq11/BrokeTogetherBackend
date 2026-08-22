@@ -166,12 +166,6 @@ public class AuthController {
 
     // Verify the access token by calling Google's userinfo endpoint
     RestTemplate rest = new RestTemplate();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> googleUser = rest.getForObject(
-        "https://www.googleapis.com/oauth2/v3/userinfo",
-        Map.class,
-        Map.of()
-    );
 
     // Attach the token in the Authorization header manually
     org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
