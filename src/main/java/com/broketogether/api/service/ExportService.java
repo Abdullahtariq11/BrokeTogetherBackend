@@ -54,15 +54,28 @@ public class ExportService extends Utility {
         for (Expense expense : expenses) {
             printer.printRecord(
                     expense.getCreatedAt() != null ? expense.getCreatedAt().toLocalDate() : "N/A",
-                    expense.getDescription(),
-                    expense.getCategory() != null ? expense.getCategory() : "General",
+                    sanitizeCsvField(expense.getDescription()),
+                    sanitizeCsvField(expense.getCategory() != null ? expense.getCategory() : "General"),
                     expense.getAmount(),
-                    expense.getPayer() != null ? expense.getPayer().getName() : "Unknown"
+                    sanitizeCsvField(expense.getPayer() != null ? expense.getPayer().getName() : "Unknown")
             );
         }
 
         printer.flush();
         return out.toByteArray();
+    }
+
+    // Prevents CSV/formula injection: a household member could name an expense
+    // e.g. `=HYPERLINK(...)` and have it execute as a formula when another
+    // member opens the exported report in Excel/Sheets. Prefixing with a single
+    // quote forces spreadsheet apps to treat it as literal text.
+    private static String sanitizeCsvField(String value) {
+        if (value == null || value.isEmpty()) return value;
+        char first = value.charAt(0);
+        if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
+            return "'" + value;
+        }
+        return value;
     }
 
     // ── PDF Export ────────────────────────────────────────────────────────────
