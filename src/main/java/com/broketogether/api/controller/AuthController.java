@@ -9,6 +9,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.client.RestTemplate;
 
 import jakarta.validation.Valid;
@@ -62,7 +63,10 @@ public class AuthController {
   /**
    * Login endpoint - Authenticates user and returns JWT token.
    *
-   * @param loginRequest DTO containing user's email and password
+   * @param loginRequest  DTO containing user's email and password
+   * @param clientPlatform optional "X-Client-Platform" header; when "mobile", the
+   *                       issued token stays valid for 30 days instead of the
+   *                       default 24-hour web session
    *
    * @return ResponseEntity with JwtResponse containing token and user info
    * @throws org.springframework.security.authentication.BadCredentialsException if
@@ -71,8 +75,10 @@ public class AuthController {
    *                                                                             invalid
    */
   @PostMapping("/login")
-  public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
+  public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest,
+      @RequestHeader(value = "X-Client-Platform", required = false) String clientPlatform) {
     String email = loginRequest.getUsername().toLowerCase().trim();
+    boolean isMobile = "mobile".equalsIgnoreCase(clientPlatform);
 
     try {
       UsernamePasswordAuthenticationToken authToken =
@@ -84,7 +90,7 @@ public class AuthController {
       // Reset failed attempts on successful login
       loginAttemptService.loginSucceeded(email);
 
-      String jwt = jwtUtils.generateToken(authentication);
+      String jwt = jwtUtils.generateToken(authentication, isMobile);
       User userDetails = (User) authentication.getPrincipal();
       return ResponseEntity.ok(new JwtResponse(jwt, userDetails.getEmail(), userDetails.getName()));
 
@@ -194,7 +200,9 @@ public class AuthController {
       return userRepository.save(newUser);
     });
 
-    String jwt = jwtUtils.generateToken(user);
+    // This endpoint is only ever called by the mobile app, so always issue a
+    // long-lived (30-day) token.
+    String jwt = jwtUtils.generateToken(user, true);
     return ResponseEntity.ok(new JwtResponse(jwt, user.getEmail(), user.getName()));
   }
 
