@@ -19,6 +19,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
+    @Value("${app.mobile-redirect-uri}")
+    private String mobileRedirectUri;
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
@@ -45,7 +48,13 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         });
 
         String token = jwtUtils.generateToken(user);
-        getRedirectStrategy().sendRedirect(request, response,
-                frontendUrl + "/oauth2/callback?token=" + token);
+
+        Object mobileFlag = request.getSession(true).getAttribute(MobileOAuth2FlagFilter.SESSION_ATTRIBUTE);
+        request.getSession().removeAttribute(MobileOAuth2FlagFilter.SESSION_ATTRIBUTE);
+        String target = Boolean.TRUE.equals(mobileFlag)
+                ? mobileRedirectUri + "?token=" + token
+                : frontendUrl + "/oauth2/callback?token=" + token;
+
+        getRedirectStrategy().sendRedirect(request, response, target);
     }
 }
