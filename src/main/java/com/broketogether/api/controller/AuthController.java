@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.broketogether.api.config.JwtUtils;
+import com.broketogether.api.dto.AppleMobileRequest;
 import com.broketogether.api.dto.ForgotPasswordRequest;
 import com.broketogether.api.dto.GoogleMobileRequest;
 import com.broketogether.api.dto.JwtResponse;
@@ -25,9 +26,11 @@ import com.broketogether.api.dto.RegisterRequest;
 import com.broketogether.api.dto.TokenResetPasswordRequest;
 import com.broketogether.api.model.User;
 import com.broketogether.api.repository.UserRepository;
+import com.broketogether.api.service.AppleIdTokenVerifier;
 import com.broketogether.api.service.LoginAttemptService;
 import com.broketogether.api.service.PasswordResetService;
 import com.broketogether.api.service.UserService;
+import com.nimbusds.jwt.JWTClaimsSet;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.http.HttpStatus;
@@ -46,11 +49,12 @@ public class AuthController {
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final LoginAttemptService loginAttemptService;
+  private final AppleIdTokenVerifier appleIdTokenVerifier;
 
   public AuthController(UserService userService, AuthenticationManager authenticationManager,
       JwtUtils jwtUtils, PasswordResetService passwordResetService,
       UserRepository userRepository, PasswordEncoder passwordEncoder,
-      LoginAttemptService loginAttemptService) {
+      LoginAttemptService loginAttemptService, AppleIdTokenVerifier appleIdTokenVerifier) {
     this.userService = userService;
     this.authenticationManager = authenticationManager;
     this.jwtUtils = jwtUtils;
@@ -58,6 +62,7 @@ public class AuthController {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.loginAttemptService = loginAttemptService;
+    this.appleIdTokenVerifier = appleIdTokenVerifier;
   }
 
   /**
@@ -196,6 +201,48 @@ public class AuthController {
 
     // This endpoint is only ever called by the mobile app, so always issue a
     // long-lived (30-day) token.
+    String jwt = jwtUtils.generateToken(user, true);
+    return ResponseEntity.ok(new JwtResponse(jwt, user.getEmail(), user.getName()));
+  }
+
+  /**
+   * Mobile Sign in with Apple — verifies the identity token Apple issued to the
+   * app, finds or creates the user, and returns a BrokeTogether JWT.
+   *
+   * <p>
+   * Called by the React Native app after expo-apple-authentication completes the
+   * native authorization flow. Apple only sends {@code fullName} on the very
+   * first authorization for a given user, so it's used solely to set the
+   * display name at account-creation time.
+   */
+  @PostMapping("/apple/mobile")
+  public ResponseEntity<JwtResponse> appleMobileLogin(
+      @Valid @RequestBody AppleMobileRequest request) {
+
+    JWTClaimsSet claims = appleIdTokenVerifier.verify(request.getIdentityToken());
+
+    String email;
+    try {
+      email = claims.getStringClaim("email");
+    } catch (java.text.ParseException e) {
+      throw new IllegalArgumentException("Invalid Apple identity token.");
+    }
+    if (email == null || email.isBlank()) {
+      throw new IllegalArgumentException("Apple did not provide an email for this account.");
+    }
+    final String normalizedEmail = email.toLowerCase().trim();
+
+    String requestedName = request.getFullName();
+    final String name = (requestedName != null && !requestedName.isBlank())
+        ? requestedName.trim() : normalizedEmail;
+
+    // Find or create the user (mirrors googleMobileLogin above)
+    User user = userRepository.findByEmailIgnoreCase(normalizedEmail).orElseGet(() -> {
+      User newUser = new User(name, normalizedEmail,
+          passwordEncoder.encode(UUID.randomUUID().toString()));
+      return userRepository.save(newUser);
+    });
+
     String jwt = jwtUtils.generateToken(user, true);
     return ResponseEntity.ok(new JwtResponse(jwt, user.getEmail(), user.getName()));
   }

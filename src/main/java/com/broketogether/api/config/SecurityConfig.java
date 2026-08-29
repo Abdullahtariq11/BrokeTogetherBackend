@@ -14,6 +14,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -34,6 +35,7 @@ public class SecurityConfig {
   private final JwtAuthenticationFilter jwtAuthFilter;
   private final RateLimitFilter rateLimitFilter;
   private final OAuth2SuccessHandler oauth2SuccessHandler;
+  private final MobileOAuth2FlagFilter mobileOAuth2FlagFilter;
 
   /**
    * Constructor injection of required dependencies.
@@ -45,13 +47,14 @@ public class SecurityConfig {
    */
   public SecurityConfig(PasswordEncoder passwordEncoder, UserDetailsService userDetailsService,
       JwtAuthenticationFilter jwtAuthFilter, RateLimitFilter rateLimitFilter,
-      OAuth2SuccessHandler oauth2SuccessHandler) {
+      OAuth2SuccessHandler oauth2SuccessHandler, MobileOAuth2FlagFilter mobileOAuth2FlagFilter) {
 
     this.passwordEncoder = passwordEncoder;
     this.userDetailsService = userDetailsService;
     this.jwtAuthFilter = jwtAuthFilter;
     this.rateLimitFilter = rateLimitFilter;
     this.oauth2SuccessHandler = oauth2SuccessHandler;
+    this.mobileOAuth2FlagFilter = mobileOAuth2FlagFilter;
   }
 
   /**
@@ -205,7 +208,8 @@ public class SecurityConfig {
     .oauth2Login(oauth2 -> oauth2
         .successHandler(oauth2SuccessHandler))
     .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-    .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+    .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+    .addFilterBefore(mobileOAuth2FlagFilter, OAuth2AuthorizationRequestRedirectFilter.class);
 
     return http.build();
   }
