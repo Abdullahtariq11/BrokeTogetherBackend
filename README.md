@@ -2,6 +2,12 @@
 
 A robust Spring Boot REST API for the BrokeTogether expense-splitting application. Handle shared expenses, track balances, and settle up with roommates seamlessly.
 
+> 🏆 Built for **RevenueCat Shipaton 2026** — Next Gen Award entry. Pairs with the [BrokeTogether mobile app](https://github.com/Abdullahtariq11/BrokeTogetherClient).
+
+## 🎬 Demo Video
+
+▶️ [Watch the demo](https://www.youtube.com/) *(link goes live before the submission deadline)*
+
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
@@ -101,8 +107,8 @@ src/main/java/com/broketogether/api/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/BrokeTogether-Backend.git
-   cd BrokeTogether-Backend
+   git clone https://github.com/Abdullahtariq11/BrokeTogetherBackend.git
+   cd BrokeTogetherBackend
    ```
 
 2. **Configure the database**
@@ -574,7 +580,7 @@ java -jar target/broketogether-api-0.0.1-SNAPSHOT.jar
 
 ## 🔗 Related
 
-- [BrokeTogether Client](https://github.com/yourusername/BrokeTogetherClient) - React Native Mobile App
+- [BrokeTogether Client](https://github.com/Abdullahtariq11/BrokeTogetherClient) - React Native Mobile App
 
 ## 👤 Author
 
