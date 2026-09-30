@@ -30,11 +30,16 @@ A robust Spring Boot REST API for the BrokeTogether expense-splitting applicatio
 
 ## ✨ Features
 
-- **🔐 JWT Authentication** - Secure, stateless authentication
+- **🔐 JWT Authentication** - Secure, stateless authentication with Google & Apple mobile sign-in
+- **🔑 Password Recovery** - Token-based forgot/reset password flow
 - **🏡 Household Management** - Create homes, invite members via unique codes
-- **💰 Expense Tracking** - Log expenses with flexible splitting options
+- **💰 Expense Tracking** - Log expenses with equal, selective, or custom splits
+- **🔁 Recurring Expenses** - Schedule repeating household bills
+- **🛒 Shopping List** - Shared list with price tracking, convertible to expenses (Pro)
 - **📊 Balance Calculation** - Real-time net balance computation
-- **✅ Settlement System** - Record payments between members
+- **💡 Settlement Suggestions** - Smart who-pays-whom recommendations
+- **📈 Analytics & Export** - Insights dashboard plus PDF/CSV export
+- **💳 Billing** - Stripe checkout/portal plus RevenueCat webhooks for mobile entitlements
 - **👥 Member Management** - Admin controls for home creators
 - **🐳 Dockerized** - Containerized for consistent deployments
 - **☁️ Cloud Ready** - Deployed on Railway
@@ -61,9 +66,12 @@ src/main/java/com/broketogether/api/
 │   ├── SecurityConfig.java      # JWT filter chain configuration
 │   └── JwtService.java          # Token generation & validation
 ├── controller/
-│   ├── AuthController.java      # Login & registration endpoints
+│   ├── AuthController.java      # Login, registration, social sign-in, password reset
+│   ├── BillingController.java   # Stripe + RevenueCat billing & webhooks
+│   ├── ExpenseController.java   # Expense, balance, analytics & export operations
 │   ├── HomeController.java      # Household management
-│   ├── ExpenseController.java   # Expense & balance operations
+│   ├── RecurringExpenseController.java  # Recurring expense schedules
+│   ├── ShoppingItemController.java      # Shared shopping list
 │   └── UserController.java      # User profile endpoints
 ├── dto/
 │   ├── request/                 # Incoming request DTOs
@@ -80,7 +88,11 @@ src/main/java/com/broketogether/api/
 │   ├── User.java                # User entity
 │   ├── Home.java                # Household entity
 │   ├── Expense.java             # Expense entity
-│   └── ExpenseSplit.java        # Split tracking entity
+│   ├── ExpenseSplit.java        # Split tracking entity
+│   ├── RecurringExpense.java    # Recurring expense schedule
+│   ├── ShoppingItem.java        # Shopping list item
+│   ├── PasswordResetToken.java  # Password reset tokens
+│   └── SubscriptionStatus.java  # Billing subscription state
 ├── repository/
 │   ├── UserRepository.java
 │   ├── HomeRepository.java
@@ -89,7 +101,14 @@ src/main/java/com/broketogether/api/
 ├── service/
 │   ├── AuthService.java         # Authentication logic
 │   ├── HomeService.java         # Home business logic
-│   └── ExpenseService.java      # Expense & balance logic
+│   ├── ExpenseService.java      # Expense & balance logic
+│   ├── RecurringExpenseService.java  # Recurring expense logic
+│   ├── ShoppingItemService.java # Shopping list logic
+│   ├── AnalyticsService.java    # Insights & analytics
+│   ├── ExportService.java       # PDF/CSV export
+│   ├── BillingService.java      # Stripe + RevenueCat billing
+│   ├── PasswordResetService.java# Password recovery flow
+│   └── UserService.java         # User profile logic
 └── exception/
     └── GlobalExceptionHandler.java
 ```
@@ -246,12 +265,16 @@ docker exec -it <container_id> /bin/sh
 
 The API follows RESTful conventions and uses JWT for authorization. All protected endpoints require the `Authorization: Bearer <token>` header.
 
-### 🔐 Authentication
+### 🔐 Authentication — `/api/v1/auth`
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `POST` | `/api/v1/auth/register` | Create a new user account | ❌ |
-| `POST` | `/api/v1/auth/login` | Login and receive JWT token | ❌ |
+| `POST` | `/register` | Create a new user account | ❌ |
+| `POST` | `/login` | Login and receive JWT token | ❌ |
+| `POST` | `/forgot-password` | Send a password-reset email (always 200 to prevent email enumeration) | ❌ |
+| `POST` | `/reset-password` | Reset password with a valid reset token | ❌ |
+| `POST` | `/google/mobile` | Mobile Google sign-in — verifies the Google access token, returns a BrokeTogether JWT (30-day) | ❌ |
+| `POST` | `/apple/mobile` | Mobile Sign in with Apple — verifies the Apple identity token, returns a BrokeTogether JWT | ❌ |
 
 **Register Request:**
 ```json
@@ -282,26 +305,31 @@ The API follows RESTful conventions and uses JWT for authorization. All protecte
 
 ---
 
-### 👤 User
+### 👤 User — `/api/v1/users`
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `GET` | `/api/v1/users/me` | Get current user profile | ✅ |
-| `GET` | `/api/v1/users` | List all users (admin) | ✅ |
+| `GET` | `/me` | Get current user profile | ✅ |
+| `PUT` | `/edit` | Update display name | ✅ |
+| `POST` | `/password-reset` | Change password (current + new password) | ✅ |
+| `DELETE` | `/me` | Permanently delete account, homes owned, and associated expenses | ✅ |
 
 ---
 
-### 🏠 Home Management
+### 🏠 Home Management — `/api/v1/homes`
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `POST` | `/api/v1/homes` | Create a new home | ✅ |
-| `GET` | `/api/v1/homes/my-homes` | List user's homes | ✅ |
-| `GET` | `/api/v1/homes/{homeId}` | Get home by ID | ✅ |
-| `POST` | `/api/v1/homes/join` | Join home via invite code | ✅ |
-| `GET` | `/api/v1/homes/{homeId}/members` | Get all members | ✅ |
-| `GET` | `/api/v1/homes/{homeId}/invite-code` | Get invite code | ✅ |
-| `DELETE` | `/api/v1/homes/{homeId}/members/{userId}` | Remove member (creator only) | ✅ |
+| `POST` | `/` | Create a new home | ✅ |
+| `GET` | `/my-homes` | List user's homes | ✅ |
+| `GET` | `/{homeId}` | Get home by ID | ✅ |
+| `PUT` | `/{homeId}` | Rename home | ✅ |
+| `POST` | `/join` | Join home via invite code | ✅ |
+| `GET` | `/{homeId}/members` | Get all members | ✅ |
+| `GET` | `/{homeId}/invite-code` | Get invite code | ✅ |
+| `POST` | `/inviteCode/{homeId}` | Regenerate invite code | ✅ |
+| `DELETE` | `/{homeId}/members/{userId}` | Remove member (creator only) | ✅ |
+| `DELETE` | `/{homeId}/leave` | Leave home | ✅ |
 
 **Create Home Request:**
 ```json
@@ -328,17 +356,21 @@ The API follows RESTful conventions and uses JWT for authorization. All protecte
 
 ---
 
-### 💸 Expenses
+### 💸 Expenses — `/api/v1/expenses`
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `POST` | `/api/v1/expenses` | Create expense (equal split) | ✅ |
-| `POST` | `/api/v1/expenses/selective` | Create expense (selective split) | ✅ |
-| `POST` | `/api/v1/expenses/settle` | Record a settlement payment | ✅ |
-| `GET` | `/api/v1/expenses/home/{homeId}/history` | Get expense history | ✅ |
-| `GET` | `/api/v1/expenses/home/{homeId}/balances` | Get member balances | ✅ |
-| `GET` | `/api/v1/expenses/expense/{expenseId}` | Get expense by ID | ✅ |
-| `DELETE` | `/api/v1/expenses/{expenseId}` | Delete expense (payer only) | ✅ |
+| `POST` | `/` | Create expense (equal split) | ✅ |
+| `POST` | `/selective` | Create expense (selective split) | ✅ |
+| `POST` | `/split` | Create expense with explicit split type | ✅ |
+| `POST` | `/settle` | Record a settlement payment | ✅ |
+| `GET` | `/home/{homeId}/history` | Get expense history (paginated) | ✅ |
+| `GET` | `/home/{homeId}/balances` | Get member balances | ✅ |
+| `GET` | `/home/{homeId}/settlements` | Settlement suggestions (who pays whom) | ✅ |
+| `GET` | `/home/{homeId}/analytics` | Expense analytics & insights | ✅ |
+| `GET` | `/home/{homeId}/export?format=pdf\|csv` | Export expense history as PDF or CSV | ✅ |
+| `GET` | `/expense/{expenseId}` | Get expense by ID | ✅ |
+| `DELETE` | `/{expenseId}` | Delete expense (payer only) | ✅ |
 
 **Create Expense (Equal Split):**
 ```json
@@ -399,6 +431,42 @@ The API follows RESTful conventions and uses JWT for authorization. All protecte
 
 ---
 
+### 🔁 Recurring Expenses — `/api/v1/expenses/recurring`
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/` | Create a recurring expense | ✅ |
+| `GET` | `/home/{homeId}` | List recurring expenses for a home | ✅ |
+| `DELETE` | `/{id}` | Deactivate a recurring expense | ✅ |
+
+---
+
+### 🛒 Shopping Items — `/api/v1/shopping-items` (Broketogether Pro)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/` | Add a shopping item | ✅ |
+| `GET` | `/item/{itemId}` | Get item by ID | ✅ |
+| `GET` | `/home/{homeId}/items` | List all shopping items for a home | ✅ |
+| `PUT` | `/item/{itemId}` | Edit a shopping item | ✅ |
+| `PATCH` | `/item/mark/{itemId}` | Mark item purchased / unpurchased | ✅ |
+| `DELETE` | `/item/{itemId}` | Delete a shopping item | ✅ |
+| `POST` | `/item/{itemId}/convert` | Convert a shopping item into an expense | ✅ |
+
+---
+
+### 💳 Billing — `/api/v1/billing`
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/checkout` | Create a Stripe checkout session | ✅ |
+| `GET` | `/status` | Get subscription / billing status | ✅ |
+| `POST` | `/portal` | Create a Stripe customer portal session | ✅ |
+| `POST` | `/webhook` | Stripe webhook receiver (signature-verified) | ❌ |
+| `POST` | `/revenuecat/webhook` | RevenueCat webhook receiver — syncs mobile entitlements | ❌ |
+
+---
+
 ## 📊 Database Schema
 
 The architecture focuses on data normalization to ensure every cent is accounted for. The `ExpenseSplit` table is the source of truth for all debt calculations.
@@ -442,6 +510,9 @@ The architecture focuses on data normalization to ensure every cent is accounted
 | Expense → User | Many-to-One (payer) |
 | ExpenseSplit → Expense | Many-to-One |
 | ExpenseSplit → User | Many-to-One |
+| RecurringExpense → Home | Many-to-One |
+| ShoppingItem → Home | Many-to-One |
+| PasswordResetToken → User | Many-to-One |
 
 ---
 
