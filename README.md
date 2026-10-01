@@ -6,7 +6,7 @@ A robust Spring Boot REST API for the BrokeTogether expense-splitting applicatio
 
 ## 🎬 Demo Video
 
-▶️ [Watch the demo](https://www.youtube.com/) *(link goes live before the submission deadline)*
+▶️ [Watch the demo](https://www.youtube.com/shorts/m6Pwq_L-kFQ)
 
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
