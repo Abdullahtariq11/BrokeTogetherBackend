@@ -17,9 +17,12 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class ReceiptScanService extends Utility {
@@ -27,6 +30,10 @@ public class ReceiptScanService extends Utility {
     private static final Logger log = LoggerFactory.getLogger(ReceiptScanService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final String OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
+    private static final int DAILY_LIMIT = 10;
+
+    // key: "userId:YYYY-MM-DD" → count
+    private final ConcurrentHashMap<String, AtomicInteger> dailyCounts = new ConcurrentHashMap<>();
 
     @Value("${openai.api-key}")
     private String openAiApiKey;
@@ -34,16 +41,16 @@ public class ReceiptScanService extends Utility {
     private final RestClient restClient = RestClient.create();
 
     public ReceiptScanResponse scan(MultipartFile file) {
+        User caller;
         try {
-            User caller = getUserDetails();
-            if (!Boolean.TRUE.equals(caller.getPremium())) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Receipt scanning is a Premium feature");
-            }
-        } catch (ResponseStatusException e) {
-            throw e;
+            caller = getUserDetails();
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
         }
+        if (!Boolean.TRUE.equals(caller.getPremium())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Receipt scanning is a Premium feature");
+        }
+        checkRateLimit(caller.getId());
 
         try {
             String base64Image = Base64.getEncoder().encodeToString(file.getBytes());
@@ -100,6 +107,17 @@ public class ReceiptScanService extends Utility {
         } catch (Exception e) {
             log.error("Receipt scan failed", e);
             return new ReceiptScanResponse(null, "Could not process receipt. Please enter amount manually.");
+        }
+    }
+
+    private void checkRateLimit(Long userId) {
+        String key = userId + ":" + LocalDate.now();
+        AtomicInteger count = dailyCounts.computeIfAbsent(key, k -> new AtomicInteger(0));
+        int used = count.incrementAndGet();
+        if (used > DAILY_LIMIT) {
+            count.decrementAndGet();
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                "Receipt scan limit reached (" + DAILY_LIMIT + "/day). Try again tomorrow.");
         }
     }
 }
