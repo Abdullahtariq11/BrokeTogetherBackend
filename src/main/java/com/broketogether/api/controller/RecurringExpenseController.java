@@ -2,6 +2,7 @@ package com.broketogether.api.controller;
 
 import com.broketogether.api.dto.RecurringExpenseRequest;
 import com.broketogether.api.dto.RecurringExpenseResponse;
+import com.broketogether.api.dto.RecurringSummaryResponse;
 import com.broketogether.api.service.RecurringExpenseService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -36,5 +37,12 @@ public class RecurringExpenseController {
     public ResponseEntity<Void> deactivate(@PathVariable Long id) throws AccountNotFoundException {
         recurringExpenseService.deactivate(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // B7: recurring summary
+    @GetMapping("/home/{homeId}/summary")
+    public ResponseEntity<RecurringSummaryResponse> summary(
+            @PathVariable Long homeId) throws AccountNotFoundException {
+        return ResponseEntity.ok(recurringExpenseService.getSummary(homeId));
     }
 }

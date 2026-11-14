@@ -8,14 +8,8 @@ import javax.security.auth.login.AccountNotFoundException;
 
 import com.broketogether.api.dto.*;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
 
 import com.broketogether.api.service.AnalyticsService;
 import com.broketogether.api.service.ExpenseService;
@@ -101,6 +95,41 @@ public class ExpenseController {
   public ResponseEntity<AnalyticsResponse> getAnalytics(@PathVariable Long homeId)
       throws AccountNotFoundException {
     return ResponseEntity.ok(analyticsService.getAnalytics(homeId));
+  }
+
+  // ── B1: patch expense ────────────────────────────────────────────────────────
+  @PatchMapping("/{expenseId}")
+  public ResponseEntity<ExpenseResponse> patch(
+      @PathVariable Long expenseId,
+      @Valid @RequestBody PatchExpenseRequest request) throws AccountNotFoundException {
+    return ResponseEntity.ok(expenseService.patchExpense(expenseId, request));
+  }
+
+  // ── B2: record payment received, settlement history, remind ──────────────────
+  @PostMapping("/settle/received")
+  public ResponseEntity<ExpenseResponse> recordReceived(
+      @Valid @RequestBody RecordPaymentRequest request) throws AccountNotFoundException {
+    return ResponseEntity.status(201).body(expenseService.recordPaymentReceived(request));
+  }
+
+  @GetMapping("/home/{homeId}/settlement-history")
+  public ResponseEntity<List<SettlementHistoryResponse>> settlementHistory(
+      @PathVariable Long homeId) throws AccountNotFoundException {
+    return ResponseEntity.ok(expenseService.getSettlementHistory(homeId));
+  }
+
+  @GetMapping("/home/{homeId}/owed-to-me")
+  public ResponseEntity<List<SettlementSuggestion>> owedToMe(
+      @PathVariable Long homeId) throws AccountNotFoundException {
+    return ResponseEntity.ok(expenseService.getOwedToMe(homeId));
+  }
+
+  // ── B3: search/filter/sort ────────────────────────────────────────────────────
+  @GetMapping("/home/{homeId}/search")
+  public ResponseEntity<PagedExpenseResponse> search(
+      @PathVariable Long homeId,
+      @ModelAttribute ExpenseSearchRequest request) throws AccountNotFoundException {
+    return ResponseEntity.ok(expenseService.searchExpenses(homeId, request));
   }
 
   @GetMapping("/home/{homeId}/export")

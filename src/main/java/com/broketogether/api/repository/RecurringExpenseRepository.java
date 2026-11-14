@@ -13,4 +13,6 @@ public interface RecurringExpenseRepository extends JpaRepository<RecurringExpen
     List<RecurringExpense> findByHomeIdAndActiveTrue(Long homeId);
 
     List<RecurringExpense> findByActiveTrueAndNextDueDateLessThanEqual(LocalDate date);
+
+    void deleteByHomeId(Long homeId);
 }

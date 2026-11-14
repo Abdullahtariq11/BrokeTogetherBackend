@@ -19,6 +19,7 @@ import com.broketogether.api.dto.HomeResponse;
 import com.broketogether.api.dto.MemberResponse;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.User;
+import com.broketogether.api.repository.*;
 import com.broketogether.api.repository.HomeRepository;
 import com.broketogether.api.repository.UserRepository;
 import org.springframework.web.server.ResponseStatusException;
@@ -28,10 +29,25 @@ public class HomeService extends Utility {
 
   private final HomeRepository homeRepository;
   private final UserRepository userRepository;
+  private final ExpenseRepository expenseRepository;
+  private final SettlementCheckpointRepository settlementCheckpointRepository;
+  private final ShoppingItemRepository shoppingItemRepository;
+  private final RecurringExpenseRepository recurringExpenseRepository;
+  private final PasswordResetTokenRepository passwordResetTokenRepository;
 
-  public HomeService(HomeRepository homeRepository, UserRepository userRepository) {
+  public HomeService(HomeRepository homeRepository, UserRepository userRepository,
+      ExpenseRepository expenseRepository,
+      SettlementCheckpointRepository settlementCheckpointRepository,
+      ShoppingItemRepository shoppingItemRepository,
+      RecurringExpenseRepository recurringExpenseRepository,
+      PasswordResetTokenRepository passwordResetTokenRepository) {
     this.homeRepository = homeRepository;
     this.userRepository = userRepository;
+    this.expenseRepository = expenseRepository;
+    this.settlementCheckpointRepository = settlementCheckpointRepository;
+    this.shoppingItemRepository = shoppingItemRepository;
+    this.recurringExpenseRepository = recurringExpenseRepository;
+    this.passwordResetTokenRepository = passwordResetTokenRepository;
   }
 
   /**
@@ -210,6 +226,40 @@ public class HomeService extends Utility {
     homeRepository.save(home);
   }
 
+
+    // ── B11: admin reset household data ──────────────────────────────────────────
+
+  @Transactional
+  public void resetHouseholdData(Long homeId) throws AccountNotFoundException {
+    User caller = getUserDetails();
+    Home home = homeRepository.findById(homeId)
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
+
+    // Only the household creator/admin may call this
+    if (!home.getCreator().getId().equals(caller.getId())) {
+      throw new ForbiddenException("Only the household admin can reset household data");
+    }
+
+    // Delete in dependency order
+    // 1. Expenses (splits cascade via orphanRemoval)
+    expenseRepository.deleteByHomeId(homeId);
+
+    // 2. Settlement checkpoints
+    settlementCheckpointRepository.deleteByHomeId(homeId);
+
+    // 3. Shopping items
+    shoppingItemRepository.deleteByHomeId(homeId);
+
+    // 4. Recurring expenses
+    recurringExpenseRepository.deleteByHomeId(homeId);
+
+    // 5. Password reset tokens for all members of this home
+    for (User member : home.getMembers()) {
+      passwordResetTokenRepository.deleteByUser(member);
+    }
+
+    // users, homes, user_homes are intentionally preserved
+  }
 
   private void changeOwnerShip(Home home,User currentUser){
     if(home==null){
