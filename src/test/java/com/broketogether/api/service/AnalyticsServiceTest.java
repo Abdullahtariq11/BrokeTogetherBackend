@@ -73,9 +73,12 @@ public class AnalyticsServiceTest {
             when(authentication.getPrincipal()).thenReturn(premiumUser);
             when(homeRepository.findById(1L)).thenReturn(Optional.of(home));
 
+            // Rent: 800, Groceries (premiumUser): 120 → total 920
+            // Rent %  = 800/920 * 100 ≈ 86.96
+            // Groceries % = 120/920 * 100 ≈ 13.04  (last category gets remainder → 100 - 86.96 = 13.04)
             Expense e1 = buildExpense(1L, "Rent", new BigDecimal("800.00"), "Rent", premiumUser);
             Expense e2 = buildExpense(2L, "Groceries run", new BigDecimal("120.00"), "Groceries", premiumUser);
-            // e3 is paid by freeUser — should NOT appear in premiumUser's category breakdown
+            // e3 is paid by freeUser — still counted in category totals (home-wide spending)
             Expense e3 = buildExpense(3L, "More groceries", new BigDecimal("80.00"), "Groceries", freeUser);
 
             when(expenseRepository.findByHomeId(1L)).thenReturn(List.of(e1, e2, e3));
@@ -83,9 +86,15 @@ public class AnalyticsServiceTest {
             AnalyticsResponse response = analyticsService.getAnalytics(1L);
 
             assertNotNull(response);
-            assertEquals(new BigDecimal("800.00"), response.spendingByCategory().get("Rent"));
-            // Only premiumUser's groceries (120.00), not freeUser's (80.00)
-            assertEquals(new BigDecimal("120.00"), response.spendingByCategory().get("Groceries"));
+            // B8: spendingByCategory returns percentages (sum = 100)
+            BigDecimal rentPct = response.spendingByCategory().get("Rent");
+            BigDecimal grocPct = response.spendingByCategory().get("Groceries");
+            assertNotNull(rentPct);
+            assertNotNull(grocPct);
+            // Percentages must sum to exactly 100
+            assertEquals(0, rentPct.add(grocPct).compareTo(new BigDecimal("100.00")));
+            // Rent is the larger share
+            assertTrue(rentPct.compareTo(grocPct) > 0);
         }
 
         @Test
@@ -104,8 +113,8 @@ public class AnalyticsServiceTest {
 
             AnalyticsResponse response = analyticsService.getAnalytics(1L);
 
-            // Old expense should be excluded from monthly totals
-            assertEquals(1, response.monthlyTotals().size());
+            // B8: always 6 months returned (gaps filled with zero); old expense excluded
+            assertEquals(6, response.monthlyTotals().size());
             assertTrue(response.monthlyTotals().values().stream()
                 .anyMatch(v -> v.compareTo(new BigDecimal("15.00")) == 0));
         }
@@ -154,7 +163,9 @@ public class AnalyticsServiceTest {
             AnalyticsResponse response = analyticsService.getAnalytics(1L);
 
             assertTrue(response.spendingByCategory().isEmpty());
-            assertTrue(response.monthlyTotals().isEmpty());
+            // B8: monthly series always has 6 entries (zeros) even with no expenses
+            assertEquals(6, response.monthlyTotals().size());
+            assertTrue(response.monthlyTotals().values().stream().allMatch(v -> v.compareTo(BigDecimal.ZERO) == 0));
             assertTrue(response.spendingByMember().isEmpty());
             assertEquals(BigDecimal.ZERO, response.largestExpenseAmount());
             assertEquals("N/A", response.largestExpenseDescription());

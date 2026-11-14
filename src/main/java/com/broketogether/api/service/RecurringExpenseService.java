@@ -2,6 +2,8 @@ package com.broketogether.api.service;
 
 import com.broketogether.api.dto.RecurringExpenseRequest;
 import com.broketogether.api.dto.RecurringExpenseResponse;
+import com.broketogether.api.dto.RecurringSummaryResponse;
+import com.broketogether.api.model.RecurringFrequency;
 import com.broketogether.api.model.Home;
 import com.broketogether.api.model.RecurringExpense;
 import com.broketogether.api.model.User;
@@ -98,6 +100,34 @@ public class RecurringExpenseService extends Utility {
 
         recurring.setActive(false);
         recurringExpenseRepository.save(recurring);
+    }
+
+    // ── B7: recurring summary ─────────────────────────────────────────────────
+
+    public RecurringSummaryResponse getSummary(Long homeId) throws AccountNotFoundException {
+        User user = getUserDetails();
+        Home home = homeRepository.findById(homeId)
+            .orElseThrow(() -> new RuntimeException("Home not found."));
+        boolean isMember = home.getMembers().stream().anyMatch(m -> m.getId().equals(user.getId()));
+        if (!isMember) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a member of this home.");
+
+        List<RecurringExpense> actives = recurringExpenseRepository.findByHomeIdAndActiveTrue(homeId);
+
+        // Normalise every rule to a monthly equivalent
+        java.math.BigDecimal totalMonthly = actives.stream()
+            .map(r -> r.getFrequency() == RecurringFrequency.WEEKLY
+                ? r.getAmount().multiply(new java.math.BigDecimal("4.33"))
+                : r.getAmount())
+            .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+            .setScale(2, java.math.RoundingMode.HALF_UP);
+
+        List<RecurringSummaryResponse.NextDueItem> nextDue = actives.stream()
+            .sorted(java.util.Comparator.comparing(RecurringExpense::getNextDueDate))
+            .map(r -> new RecurringSummaryResponse.NextDueItem(
+                r.getId(), r.getDescription(), r.getAmount(), r.getNextDueDate()))
+            .collect(Collectors.toList());
+
+        return new RecurringSummaryResponse(totalMonthly, nextDue);
     }
 
     private RecurringExpenseResponse toResponse(RecurringExpense r) {

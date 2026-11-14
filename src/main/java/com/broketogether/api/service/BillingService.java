@@ -95,7 +95,55 @@ public class BillingService extends Utility {
 
     public BillingStatusResponse getStatus() throws AccountNotFoundException {
         User user = getUserDetails();
-        return new BillingStatusResponse(user.getPremium(), user.getSubscriptionStatus());
+
+        // Defaults — returned when user has no Stripe subscription
+        java.time.LocalDate nextRenewal = null;
+        String cardLast4 = null;
+        String manageUrl = null;
+
+        if (user.getSubscriptionId() != null) {
+            try {
+                com.stripe.model.Subscription sub =
+                    com.stripe.model.Subscription.retrieve(user.getSubscriptionId());
+
+                // Next renewal date from current_period_end (Unix timestamp)
+                if (sub.getCurrentPeriodEnd() != null) {
+                    nextRenewal = java.time.Instant.ofEpochSecond(sub.getCurrentPeriodEnd())
+                        .atZone(java.time.ZoneId.of("UTC")).toLocalDate();
+                }
+
+                // Default payment method → card last 4
+                String pmId = sub.getDefaultPaymentMethod();
+                if (pmId == null && user.getStripeCustomerId() != null) {
+                    com.stripe.model.Customer customer =
+                        com.stripe.model.Customer.retrieve(user.getStripeCustomerId());
+                    pmId = customer.getInvoiceSettings() != null
+                        ? customer.getInvoiceSettings().getDefaultPaymentMethod()
+                        : null;
+                }
+                if (pmId != null) {
+                    com.stripe.model.PaymentMethod pm =
+                        com.stripe.model.PaymentMethod.retrieve(pmId);
+                    if (pm.getCard() != null) {
+                        cardLast4 = pm.getCard().getLast4();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Could not fetch Stripe subscription details for user {}: {}", user.getId(), e.getMessage());
+            }
+        }
+
+        // Generate a fresh Stripe portal URL for the manage link (best-effort)
+        if (user.getStripeCustomerId() != null) {
+            try {
+                manageUrl = createPortalSession(user);
+            } catch (Exception e) {
+                log.warn("Could not create Stripe portal session for user {}: {}", user.getId(), e.getMessage());
+            }
+        }
+
+        return new BillingStatusResponse(
+            user.getPremium(), user.getSubscriptionStatus(), nextRenewal, cardLast4, manageUrl);
     }
 
     public void handleWebhook(String payload, String sigHeader) throws StripeException {

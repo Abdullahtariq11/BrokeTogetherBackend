@@ -12,4 +12,6 @@ public interface SettlementCheckpointRepository extends JpaRepository<Settlement
 
   Optional<SettlementCheckpoint> findByUserIdAndHomeId(Long userId, Long homeId);
 
+  void deleteByHomeId(Long homeId);
+
 }

@@ -94,4 +94,11 @@ public class HomeController {
     return ResponseEntity.ok(homeService.regenerateCode(homeId));
   }
 
+  // B11: admin reset household data
+  @PostMapping("/{homeId}/reset-data")
+  public ResponseEntity<Void> resetData(@PathVariable Long homeId) throws AccountNotFoundException {
+    homeService.resetHouseholdData(homeId);
+    return ResponseEntity.noContent().build();
+  }
+
 }

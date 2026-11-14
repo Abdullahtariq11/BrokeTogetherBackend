@@ -2,8 +2,11 @@ package com.broketogether.api.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -20,6 +23,7 @@ import com.broketogether.api.exception.ResourceNotFoundException;
 import com.broketogether.api.utility.Utility;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -562,6 +566,218 @@ public class ExpenseService extends Utility {
         saved.getDescription(), saved.getCategory(), splitResponses);
     res5.setCreatedAt(saved.getCreatedAt());
     return res5;
+  }
+
+  // ── B1: PATCH expense ────────────────────────────────────────────────────────
+
+  @Transactional
+  public ExpenseResponse patchExpense(Long expenseId, PatchExpenseRequest req)
+      throws AccountNotFoundException {
+    User caller = getUserDetails();
+    Expense expense = expenseRepository.findById(expenseId)
+        .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
+
+    checkUserMemberOfHome(expense.getHome(), caller);
+
+    // Only payer or home creator may edit
+    boolean isPayer   = expense.getPayer().getId().equals(caller.getId());
+    boolean isCreator = expense.getHome().getCreator().getId().equals(caller.getId());
+    if (!isPayer && !isCreator) {
+      throw new ForbiddenException("Only the payer or household admin can edit this expense");
+    }
+
+    if (req.getDescription() != null) expense.setDescription(req.getDescription());
+    if (req.getCategory()    != null) expense.setCategory(req.getCategory());
+    if (req.getAmount()      != null) expense.setAmount(req.getAmount());
+
+    // Payer override
+    if (req.getPayerId() != null) {
+      User newPayer = userRepository.findById(req.getPayerId())
+          .orElseThrow(() -> new ResourceNotFoundException("Payer not found"));
+      checkUserMemberOfHome(expense.getHome(), newPayer);
+      expense.setPayer(newPayer);
+    }
+
+    // Re-split if split-related fields supplied
+    if (req.getSplitType() != null || req.getUserIds() != null
+        || req.getExactSplits() != null || req.getPayerFixedAmount() != null
+        || req.getAmount() != null) {
+
+      SplitType splitType = req.getSplitType() != null
+          ? req.getSplitType()
+          : SplitType.EQUAL;
+
+      Set<User> participants;
+      if (splitType == SplitType.PERSONAL) {
+        participants = Set.of(expense.getPayer());
+      } else if (req.getUserIds() != null && !req.getUserIds().isEmpty()) {
+        List<User> selected = userRepository.findAllById(req.getUserIds());
+        participants = new HashSet<>(selected);
+        participants.add(expense.getPayer());
+        Set<Long> homeMemberIds = expense.getHome().getMembers().stream()
+            .map(User::getId).collect(Collectors.toSet());
+        for (User m : participants) {
+          if (!homeMemberIds.contains(m.getId()))
+            throw new ForbiddenException("User " + m.getId() + " is not a member of this home");
+        }
+      } else {
+        participants = expense.getHome().getMembers();
+      }
+
+      // Build a temporary ExpenseRequestUpdated to reuse getSplits()
+      ExpenseRequestUpdated tmp = new ExpenseRequestUpdated(
+          expense.getAmount(), expense.getDescription(), expense.getCategory(),
+          participants.stream().map(User::getId).collect(Collectors.toSet()),
+          req.getExactSplits(), splitType, req.getPayerFixedAmount());
+      tmp.setHomeId(expense.getHome().getId());
+
+      expense.getSplits().clear();
+      expense.getSplits().addAll(getSplits(expense, expense.getPayer(), participants, tmp));
+    }
+
+    Expense saved = expenseRepository.save(expense);
+    return buildResponse(saved);
+  }
+
+  // ── B2: record payment received ──────────────────────────────────────────────
+
+  /**
+   * Records a payment RECEIVED — the caller is the creditor, the debtor paid them.
+   * Mirrors settleUp() but in the reverse direction.
+   */
+  @Transactional
+  public ExpenseResponse recordPaymentReceived(RecordPaymentRequest req)
+      throws AccountNotFoundException {
+    User creditor = getUserDetails();
+    User debtor   = userRepository.findById(req.getDebtorId())
+        .orElseThrow(() -> new ResourceNotFoundException("Debtor not found"));
+    Home home = homeRepository.findById(req.getHomeId())
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
+
+    boolean creditorInHome = home.getMembers().stream().anyMatch(m -> m.getId().equals(creditor.getId()));
+    boolean debtorInHome   = home.getMembers().stream().anyMatch(m -> m.getId().equals(debtor.getId()));
+    if (!creditorInHome || !debtorInHome) {
+      throw new ForbiddenException("Both users must be members of the same home");
+    }
+
+    String methodNote = req.getMethod() != null ? " via " + req.getMethod() : "";
+    Expense settlement = new Expense();
+    settlement.setAmount(req.getAmount());
+    settlement.setCategory("SETTLEMENT");
+    settlement.setDescription("Payment from " + debtor.getName() + " to " + creditor.getName() + methodNote);
+    settlement.setHome(home);
+    // The debtor is the payer of this settlement (they paid the creditor)
+    settlement.setPayer(debtor);
+
+    // Split lands on the creditor — they received the money
+    ExpenseSplit split = new ExpenseSplit(settlement, creditor, req.getAmount());
+    settlement.setSplits(List.of(split));
+
+    Expense saved = expenseRepository.save(settlement);
+
+    // Update checkpoint for the debtor (they settled)
+    LocalDateTime now = LocalDateTime.now();
+    SettlementCheckpoint checkpoint = settlementCheckpointRepository
+        .findByUserIdAndHomeId(debtor.getId(), req.getHomeId())
+        .orElseGet(() -> new SettlementCheckpoint(debtor, home, now));
+    checkpoint.setSettledAt(now);
+    settlementCheckpointRepository.save(checkpoint);
+
+    return buildResponse(saved);
+  }
+
+  /** Settlement history for a home — all SETTLEMENT-category expenses. */
+  @Transactional(readOnly = true)
+  public List<SettlementHistoryResponse> getSettlementHistory(Long homeId)
+      throws AccountNotFoundException {
+    User caller = getUserDetails();
+    Home home = homeRepository.findById(homeId)
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
+    checkUserMemberOfHome(home, caller);
+
+    return expenseRepository.findSettlementsByHomeId(homeId).stream()
+        .map(e -> new SettlementHistoryResponse(
+            e.getId(), e.getAmount(), e.getDescription(),
+            e.getPayer() != null ? e.getPayer().getId()   : null,
+            e.getPayer() != null ? e.getPayer().getName() : null,
+            e.getCreatedAt()))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Remind endpoint — returns outstanding owed-to-you balances.
+   * No messages are sent outside the app.
+   */
+  @Transactional(readOnly = true)
+  public List<SettlementSuggestion> getOwedToMe(Long homeId) throws AccountNotFoundException {
+    User caller = getUserDetails();
+    Map<Long, BigDecimal> balances = getHomeBalances(homeId);
+    BigDecimal myBalance = balances.getOrDefault(caller.getId(), BigDecimal.ZERO);
+    if (myBalance.compareTo(BigDecimal.ZERO) <= 0) return List.of();
+
+    // Return full settlement suggestions filtered to ones where the creditor is me
+    return getSettlements(homeId).stream()
+        .filter(s -> s.creditorId().equals(caller.getId()))
+        .collect(Collectors.toList());
+  }
+
+  // ── B3: search/filter/sort ────────────────────────────────────────────────────
+
+  @Transactional(readOnly = true)
+  public PagedExpenseResponse searchExpenses(Long homeId, ExpenseSearchRequest req)
+      throws AccountNotFoundException {
+    User caller = getUserDetails();
+    Home home = homeRepository.findById(homeId)
+        .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
+    checkUserMemberOfHome(home, caller);
+
+    LocalDateTime from = req.getFrom() != null ? req.getFrom().atStartOfDay()          : null;
+    LocalDateTime to   = req.getTo()   != null ? req.getTo().atTime(LocalTime.MAX)      : null;
+
+    Sort sort = switch (req.getSort() == null ? "date_desc" : req.getSort()) {
+      case "date_asc"    -> Sort.by("createdAt").ascending();
+      case "amount_desc" -> Sort.by("amount").descending();
+      case "amount_asc"  -> Sort.by("amount").ascending();
+      default            -> Sort.by("createdAt").descending();
+    };
+
+    Page<Expense> page = expenseRepository.search(
+        homeId,
+        req.getQuery()    != null && !req.getQuery().isBlank() ? req.getQuery() : null,
+        req.getCategory() != null && !req.getCategory().isBlank() ? req.getCategory() : null,
+        req.getMemberId(),
+        from, to,
+        req.getType()     != null && !req.getType().isBlank() ? req.getType().toLowerCase() : null,
+        PageRequest.of(req.getPage(), Math.min(req.getSize(), 100), sort)
+    );
+
+    List<ExpenseResponse> responses = page.getContent().stream()
+        .map(this::buildResponse)
+        .collect(Collectors.toList());
+
+    LocalDateTime lastSettledAt = settlementCheckpointRepository
+        .findByUserIdAndHomeId(caller.getId(), homeId)
+        .map(SettlementCheckpoint::getSettledAt)
+        .orElse(null);
+
+    return new PagedExpenseResponse(responses, !page.isLast(), page.getNumber(), lastSettledAt);
+  }
+
+  // ── helper: build ExpenseResponse from Expense entity ─────────────────────────
+
+  private ExpenseResponse buildResponse(Expense expense) {
+    Map<Long, ExpenseSplitResponse> splitMap = new HashMap<>();
+    for (ExpenseSplit s : expense.getSplits()) {
+      splitMap.put(s.getUser().getId(), new ExpenseSplitResponse(s.getId(), s.getAmount()));
+    }
+    ExpenseResponse r = new ExpenseResponse(expense.getId(), expense.getAmount(),
+        expense.getDescription(), expense.getCategory(), splitMap);
+    if (expense.getPayer() != null) {
+      r.setPayerId(expense.getPayer().getId());
+      r.setPayerName(expense.getPayer().getName());
+    }
+    r.setCreatedAt(expense.getCreatedAt());
+    return r;
   }
 
   @Transactional(readOnly = true)
