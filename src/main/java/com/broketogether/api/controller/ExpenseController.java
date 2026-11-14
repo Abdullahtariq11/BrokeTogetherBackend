@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 import com.broketogether.api.service.AnalyticsService;
 import com.broketogether.api.service.ExpenseService;
 import com.broketogether.api.service.ExportService;
+import com.broketogether.api.service.ReceiptScanService;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -25,12 +27,14 @@ public class ExpenseController {
   private final ExpenseService expenseService;
   private final ExportService exportService;
   private final AnalyticsService analyticsService;
+  private final ReceiptScanService receiptScanService;
 
   public ExpenseController(ExpenseService expenseService, ExportService exportService,
-      AnalyticsService analyticsService) {
+      AnalyticsService analyticsService, ReceiptScanService receiptScanService) {
     this.expenseService = expenseService;
     this.exportService = exportService;
     this.analyticsService = analyticsService;
+    this.receiptScanService = receiptScanService;
   }
 
   @PostMapping
@@ -150,6 +154,13 @@ public class ExpenseController {
           .contentType(MediaType.parseMediaType("text/csv"))
           .body(csv);
     }
+  }
+
+  // B4: Receipt OCR — premium only, never auto-saves
+  @PostMapping(value = "/scan-receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ReceiptScanResponse> scanReceipt(
+      @RequestParam("file") MultipartFile file) {
+    return ResponseEntity.ok(receiptScanService.scan(file));
   }
 
 }
