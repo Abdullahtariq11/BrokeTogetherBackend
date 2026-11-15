@@ -1,0 +1,8 @@
+package com.broketogether.api.dto;
+
+import java.math.BigDecimal;
+
+public record ReceiptScanResponse(
+    BigDecimal amount,
+    String note
+) {}
