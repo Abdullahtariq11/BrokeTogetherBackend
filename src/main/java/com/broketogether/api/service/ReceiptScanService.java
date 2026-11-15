@@ -91,8 +91,19 @@ public class ReceiptScanService extends Utility {
                 .retrieve()
                 .body(String.class);
 
+            log.info("OpenAI raw response: {}", responseBody);
+
             JsonNode root = mapper.readTree(responseBody);
+
+            // Check for OpenAI-level error (e.g. invalid key, quota exceeded)
+            if (root.has("error")) {
+                String errMsg = root.path("error").path("message").asText("OpenAI error");
+                log.error("OpenAI API error: {}", errMsg);
+                return new ReceiptScanResponse(null, "OpenAI error: " + errMsg);
+            }
+
             String content = root.path("choices").get(0).path("message").path("content").asText();
+            log.info("OpenAI content: {}", content);
 
             // Strip markdown code fences if present
             content = content.replaceAll("```json\\s*", "").replaceAll("```\\s*", "").trim();
@@ -105,7 +116,7 @@ public class ReceiptScanService extends Utility {
             return new ReceiptScanResponse(amount, note);
 
         } catch (Exception e) {
-            log.error("Receipt scan failed", e);
+            log.error("Receipt scan failed: {}", e.getMessage(), e);
             return new ReceiptScanResponse(null, "Could not process receipt. Please enter amount manually.");
         }
     }
